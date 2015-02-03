@@ -1,0 +1,8 @@
+speed=4
+gfxheight=64 
+gfxwidth=64
+height=32
+width=48
+framestyle=1
+frames=2
+framespeed=9

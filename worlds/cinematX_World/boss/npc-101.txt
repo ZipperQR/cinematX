@@ -1,0 +1,12 @@
+framestyle=1
+framespeed=7
+frames=32
+height=64
+width=32
+gfxoffsetx=0
+gfxoffsety=0 
+gfxheight=96 
+gfxwidth=96
+nohurt=0
+jumphurt=1
+score=0
