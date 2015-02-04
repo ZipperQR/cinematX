@@ -257,7 +257,7 @@ do
 				if    self:getSpeedY() == 0 then
 					if    math.abs (self:getSpeedX()) < 1 then
 						if    cinematX.dialogSpeaker == self   then
-							self:setAnimState = (self.talkAnim)
+							self:setAnimState (self.talkAnim)
 						else
 						
 							if (self:distanceActor (cinematX.playerActor) < 64) then
