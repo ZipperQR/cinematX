@@ -1078,17 +1078,17 @@ do
 	
 	cinematX.npcCache = {}
 	
+	-- Swap this for the location to store and read the NPC unique ID. 0x08 appears unused, but this can be changed to any unused word.
+	cinematX.ID_MEM =  0x08
+	
 	function cinematX.indexActors (onlyIndexNew)
 		 
 		-- Loop through every NPC, create an indexed actor instance for each one and store the messages & other info
 		local i = 0
 		
-		-- Swap this for the location to store and read the NPC unique ID. 0x08 appears unused, but this can be changed to any unused word.
-		local idmem = 0x08
-
 		for k,v in pairs (npcs()) do
 	   
-			local uid = v:mem(idmem, FIELD_WORD);
+			local uid = v:mem(cinematX.ID_MEM, FIELD_WORD);
 			 
 			--Validity check message string to ensure we don't follow null pointers.
 			local msgStr = ""
@@ -1096,7 +1096,7 @@ do
 			 
 			--Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
 			if(uid == 0) then
-				v:mem(idmem, FIELD_WORD, cinematX.actorCount);
+				v:mem(cinematX.ID_MEM, FIELD_WORD, cinematX.actorCount);
 				uid = cinematX.actorCount;
 				cinematX.actorCount = cinematX.actorCount + 1;
 			end
