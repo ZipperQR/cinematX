@@ -117,6 +117,7 @@ do
 	   thisActorObj.messagePointer = ""
 	   thisActorObj.messageString = ""
 	   thisActorObj.nameString = ""
+	   thisActorObj.talkTypeString = ""
 	   thisActorObj.wordBubbleIcon = nil
 	   thisActorObj.messageIsNew = true
 	   
@@ -1118,7 +1119,7 @@ function cinematX.indexActors (onlyIndexNew)
          
          --Validity check message string to ensure we don't follow null pointers.
          local msgStr = ""
-	 if(v:mem (0x4C, FIELD_DWORD) > 0) then msgStr = v.msg.str end
+		if(v:mem (0x4C, FIELD_DWORD) > 0) then msgStr = v.msg.str end
          
 		 --Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
          if(uid == 0) then
@@ -1157,11 +1158,12 @@ function cinematX.indexActors (onlyIndexNew)
                   and  checkStringB == "{}")  then
 
                   -- Parse tags
-                  local parsedKey     = cinematX.parseTagFromNPCMessage (msgStr, "key")
-                  local parsedName    = cinematX.parseTagFromNPCMessage (msgStr, "name")
-                  local parsedIcon    = cinematX.parseTagFromNPCMessage (msgStr, "icon")
-                  local parsedScene   = cinematX.parseTagFromNPCMessage (msgStr, "scene")
-                  local parsedRoutine = cinematX.parseTagFromNPCMessage (msgStr, "routine")
+                  local parsedKey       = cinematX.parseTagFromNPCMessage (msgStr, "key")
+                  local parsedName      = cinematX.parseTagFromNPCMessage (msgStr, "name")
+                  local parsedTalkType  = cinematX.parseTagFromNPCMessage (msgStr, "verb")
+                  local parsedIcon      = cinematX.parseTagFromNPCMessage (msgStr, "icon")
+                  local parsedScene     = cinematX.parseTagFromNPCMessage (msgStr, "scene")
+                  local parsedRoutine   = cinematX.parseTagFromNPCMessage (msgStr, "routine")
                      
                      
                   -- Store key for use in getNPCFromKey() if parsed
@@ -1172,9 +1174,15 @@ function cinematX.indexActors (onlyIndexNew)
                  
                   -- Store name if parsed
                   if (parsedName == nil) then
-                     parsedName = "UNNAMED NPC"
+                     parsedName = ""
                   end
                   thisActor.nameString = parsedName
+                  
+				  -- Store talk type string if parsed
+                  if (parsedTalkType == nil) then
+                     parsedTalkType = "talk"
+                  end
+                  thisActor.talkTypeString = parsedTalkType
                  
                   -- Store icon if parsed
                   thisActor.wordBubbleIcon = tonumber (parsedIcon)
@@ -1297,7 +1305,7 @@ function cinematX.indexActors (onlyIndexNew)
 									
 									--tempIcon = cinematX.IMGSLOT_NPCICON_PRESSUP
 									cinematX.subtitleBox = true
-									cinematX.displayNPCSubtitle (v.nameString, "[UP] to talk.")
+									cinematX.displayNPCSubtitle (v.nameString, "[UP] to "..v.talkTypeString..".")
 								end
 									
 								
@@ -1418,6 +1426,8 @@ function cinematX.indexActors (onlyIndexNew)
 		if   (cinematX.showDebugInfo == true)   then
 		
 			-- Display console
+			
+			--[[
 			if  (cinematX.showConsole == true)  then	
 				local i = 0
 				for k,v in pairs (cinematX.debugLogTable) do
@@ -1437,6 +1447,7 @@ function cinematX.indexActors (onlyIndexNew)
 				-- Disable cheating when the console is not open
 				getInput():clear ()
 			end
+			--]]
 			
 			--[[
 			printText ("Delta Time: "..string.format("%.3f", cinematX.deltaTime), 4, 20, 100)  
@@ -2360,14 +2371,14 @@ do
 	
 	function cinematX.runCutscene (func)
 		cinematX.changeSceneMode (cinematX.SCENESTATE_CUTSCENE)
-		cinematX.enterCameraMode ()
+		--cinematX.enterCameraMode ()
 		
 		return cinematX.runCoroutine (func)
 	end
 
 	function cinematX.endCutscene ()
 		cinematX.changeSceneMode (cinematX.SCENESTATE_PLAY)
-		cinematX.exitCameraMode ()
+		--cinematX.exitCameraMode ()
 	end
 	
 	
