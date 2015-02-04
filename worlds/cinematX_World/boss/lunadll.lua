@@ -266,18 +266,18 @@ do
 		cinematX.waitSeconds (1)
 		
 		--playMusic (17)
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "A-ha! 'Twas a good show, "..cinematX.playerNameASXT()..", but I       emerge the victor!", 30, 30, "voice_talk1.wav")  
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "A-ha! 'Twas a good show, "..cinematX.playerNameASXT()..", but I       emerge the victor!", 30, 30, "voice_talk1.wav")  
 		cinematX.waitForDialog ()
 
-		cinematX.startDialog  (NPCID_IRIS, cinematX.playerNameASXT(), "B-but we really need that leek!            Best two out of three?", 30, 30, "")
+		cinematX.startDialog  (nil, cinematX.playerNameASXT(), "B-but we really need that leek!            Best two out of three?", 30, 30, "")
 		cinematX.waitForDialog ()
 		  
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "Tsk, tsk, tsk! Nobody likes a sore loser,  my dear!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Tsk, tsk, tsk! Nobody likes a sore loser,  my dear!", 30, 30, "")
 		cinematX.waitForDialog ()
 
 		-- Broadsword begins walking away, stops and turns back around
 		cinematX.configDialog (false, false, 1)	
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "But I am still feeling a tad sporting...", 160, 100, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "But I am still feeling a tad sporting...", 160, 100, "")
 
 		broadswordActor:walk (2)
 		cinematX.waitSeconds (1)
@@ -286,22 +286,22 @@ do
 		cinematX.waitSeconds (1)
 		  
 		-- Broadsword challenges the player to a duel
-		broadswordActor:setDirection(DIR_LEFT)
+		broadswordActor:setDirection (DIR_LEFT)
 		
 		cinematX.configDialog (true, true, 1)	
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "Very well! If this preposterous produce    means that much to you, then come and have  a go!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Very well! If this preposterous produce    means that much to you, then come and have  a go!", 30, 30, "")
 		cinematX.waitForDialog ()
 		  
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "Best moi in a duel and the colossal        cabbage is yours!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Best moi in a duel and the colossal        cabbage is yours!", 30, 30, "")
 		cinematX.waitForDialog ()
 
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "But I shant take this challenge lightly,   so don't hold back yourself!", 30, 30, "voice_talk4.wav")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "But I shant take this challenge lightly,   so don't hold back yourself!", 30, 30, "voice_talk4.wav")
 		cinematX.waitForDialog ()
 		  
 		  
 		-- Sword slice animation
 		cinematX.configDialog (false, false, 1)
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "EN GARDE!", 160, 160, "voice_talk5.wav")	
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "EN GARDE!", 160, 160, "voice_talk5.wav")	
 		cinematX.waitSeconds (0.6)
 		  
 		playSFX (SOUNDID_DRAWSWORD)
@@ -583,10 +583,10 @@ do
  		cinematX.waitSeconds (1)
 		cinematX.configDialog (true, true, 1)	
 		
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "I daresay, that was a most exhilarating    scuffle! Bravo!", 30, 30, "voice_talk1.wav")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "I daresay, that was a most exhilarating    scuffle! Bravo!", 30, 30, "voice_talk1.wav")
 		cinematX.waitForDialog ()
 		
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "As per our wager, the titanic tomato is    now yours. Treasure it always!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "As per our wager, the titanic tomato is    now yours. Treasure it always!", 30, 30, "")
 		cinematX.waitForDialog ()
 		
 		broadswordActor:jump (6)
@@ -596,7 +596,7 @@ do
 		cinematX.waitSeconds (1.5)
 
 		broadswordActor:setDirection (DIR_RIGHT)
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "And with that, I must take my leave. There is still much adventuring to do! Cheerio!", 30, 30, "voice_talk3.wav")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "And with that, I must take my leave. There is still much adventuring to do! Cheerio!", 30, 30, "voice_talk3.wav")
 		cinematX.waitForDialog ()
 		
 		broadswordActor:walkForward (2)
@@ -604,18 +604,18 @@ do
 		
 		broadswordActor:walk (0)
 		broadswordActor:setDirection (DIR_LEFT)
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "Ah, one more thing.", 30, 30, "voice_talk4.wav")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Ah, one more thing.", 30, 30, "voice_talk4.wav")
 		cinematX.waitForDialog ()
 		
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "My brothers are...", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "My brothers are...", 30, 30, "")
 		cinematX.waitForDialog ()
 				
 		cinematX.waitSeconds (1)
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "...", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "...", 30, 30, "")
 		cinematX.waitForDialog ()
 		
 		broadswordActor:setDirection (DIR_RIGHT)		
-		cinematX.startDialog  (NPCID_BROADSWORD, "Uncle Broadsword", "Ah, what am I doing? Spoilers, Augustus!   Spoilers!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Ah, what am I doing? Spoilers, Augustus!   Spoilers!", 30, 30, "")
 		cinematX.waitForDialog ()
 
 		broadswordActor:walk (2)

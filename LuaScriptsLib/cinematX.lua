@@ -79,6 +79,7 @@ do
 	   thisActorObj.shouldFacePlayer = false
 	   thisActorObj.closeIdleAnim = cinematX.ANIMSTATE_TALK
 	   thisActorObj.farIdleAnim = cinematX.ANIMSTATE_IDLE
+	   thisActorObj.talkAnim = cinematX.ANIMSTATE_TALK
 	   thisActorObj.walkAnim = cinematX.ANIMSTATE_WALK
 	   thisActorObj.runAnim = cinematX.ANIMSTATE_RUN
 	   
@@ -207,7 +208,6 @@ do
 		   return self.animState
 		end
 		
-		
 		function Actor:overrideAnimation (animDataTable)
 			--windowDebug ("BEGINNING WORKS")
 			local myState = self:getAnimState ()
@@ -231,7 +231,6 @@ do
 			self:clampAnim (minVal, maxVal, animDataTable [cinematX.ANIMSTATE_NUMFRAMES])
 		end
 
-
 		function Actor:clampAnim (minVal, maxVal, dirOffsetFrames)
 		  
 			-- Add an offset for flipped animations
@@ -248,7 +247,6 @@ do
 				self:setAnimFrame (minVal + dirOffset)
 			end
 		end
-
 		
 		function Actor:setAnimStateByMovement ()
 
@@ -258,9 +256,9 @@ do
 				-- If on ground
 				if    self:getSpeedY() == 0 then
 					if    math.abs (self:getSpeedX()) < 1 then
-						--if    dialogSpeaker == self   then
-						--	self.animState = ANIMSTATE_TALK
-						--else
+						if    cinematX.dialogSpeaker == self   then
+							self:setAnimState = (self.talkAnim)
+						else
 						
 							if (self:distanceActor (cinematX.playerActor) < 64) then
 								self:setAnimState (self.closeIdleAnim)
@@ -268,7 +266,7 @@ do
 								self:setAnimState (self.farIdleAnim)
 							end
 								
-						--end
+						end
 					else
 						if  math.abs (self:getSpeedX()) > 2  then
 							self:setAnimState (cinematX.ANIMSTATE_RUN)
@@ -288,7 +286,6 @@ do
 			
 	end
 	
-	
 	-- Relational
 	do
 		function Actor:getScreenX ()
@@ -300,8 +297,7 @@ do
 			local myY = self:getY () - (player.y - player.screen.top)
 			return myY
 		end
-	
-	
+		
 		function Actor:isOnScreen ()
 			local withinRegion = false
 			
@@ -316,7 +312,6 @@ do
 			return withinRegion
 		end
 
-	
 		function Actor:relativeX (posX)
 			return (posX - self.smbxObjRef.x)
 		end
@@ -333,12 +328,10 @@ do
 			return math.abs(self:relativeY (posY))
 		end
 		 
-
 		function Actor:distanceDestX ()
 			return self:distanceX (self.walkDestX)
 		end
-		 
-		 
+		 		 
 		function Actor:relativeActorX (targetActor)
 			local dist = self:relativeX (targetActor:getX())
 			return dist
@@ -349,8 +342,6 @@ do
 			return dist
 		end
 
-
-		
 		function Actor:distanceActorX (targetActor)
 			local dist = self:distanceX (targetActor:getX())
 			return dist
@@ -358,8 +349,7 @@ do
 		 
 		function Actor:distanceActorY (targetActor)
 			return self:distanceY (targetActor:getY())
-		end
-		 
+		end	 
 		  
 		function Actor:distancePos (xPos, yPos)
 			local xDist = self:distanceX (xPos)
@@ -373,7 +363,6 @@ do
 			return self:distancePos (targetActor:getX(), targetActor:getY())
 		end
 		 
-
 		function Actor:dirToX (posX)
 			if (self:relativeX (posX) > 0) then
 				return DIR_RIGHT
@@ -381,13 +370,11 @@ do
 				return DIR_LEFT
 			end
 		end
-		 
-		 
+		 	 
 		function Actor:dirToActorX (targetActor)
 			return self:dirToX (targetActor:getX())
 		end
 	end
-	
 	
 	-- Movement
 	do
@@ -494,7 +481,6 @@ do
 			self.jumpStrength = strength
 		end
 	end
-
 		
 	-- Update
 	function Actor:update ()
@@ -698,7 +684,6 @@ do
 	cinematX.delayedInitSectionNum = -1
 	
 	cinematX.initCalledYet = false
-
 	
 	function cinematX.initLevel ()
 		-- Prevent this function from being called twice
@@ -716,12 +701,10 @@ do
 		
 		cinematX.initCalledYet = true
 	end
-
 	
 	function cinematX.initSection ()
 		cinematX.initActors ()
 	end
-
 	
 	function cinematX.delayedInitLevel ()
 		cinematX.indexActors (false)
@@ -762,12 +745,11 @@ do
 	cinematX.currentMessageNPCObj = nil
 	cinematX.currentMessageNPCIndex = nil
 	cinematX.currentMessageActor = nil
-	
 		
 	function cinematX.initDialog ()
 	
 		-- Speaker object
-		cinematX.dialogSpeaker = 0
+		cinematX.dialogSpeaker = nil
 
 		-- _____
 		--cinematX.dialogSpeakerFrame = 0
@@ -829,7 +811,6 @@ do
 		cinematX.dialogInitCalled = true
 	end
 
-
 	function cinematX.initCamera ()
 		
 		-- Memory addresses of the camera's position		
@@ -884,7 +865,6 @@ do
 		cinematX.changeSceneMode (cinematX.SCENESTATE_PLAY)
 	end
 
-
 	function cinematX.initBoss ()
 		-- Current attack pattern time in frames
 		cinematX.battleFrame = 0  
@@ -910,7 +890,6 @@ do
 		-- The current display mode
 		cinematX.bossHPDisplayType = cinematX.BOSSHPDISPLAY_HITS		
 	end
-
 
 	function cinematX.initHUD ()
 
@@ -963,7 +942,6 @@ do
 		loadImage (cinematX.IMGNAME_NPCICON_QUEST_N,  cinematX.IMGSLOT_NPCICON_Q_N,  cinematX.COLOR_TRANSPARENT)
 		loadImage (cinematX.IMGNAME_NPCICON_PRESSUP,  cinematX.IMGSLOT_NPCICON_PRESSUP,  cinematX.COLOR_TRANSPARENT)
 	end
-
 	
 	function cinematX.initActors ()
 		--cinematX.playerDummyActor = 
@@ -980,12 +958,10 @@ do
 		
 		cinematX.playerControlMode = cinematX.PLAYERMODE_PLAY
 	end
-
 	
 	function cinematX.initQuestSystem ()
 		--cinematX.defineQuest ("test", "Test Quest", "Test the quest the quest the test system")
 	end
-	
 	
 	function cinematX.initDebug ()
 		cinematX.debugLogTable = {}
@@ -1006,7 +982,6 @@ end
 --***************************************************************************************************
 
 do
-
 
 	function cinematX.update ()
 		-- Call level init
@@ -1043,14 +1018,12 @@ do
 		--cinematX.updateInput ()
 	end
 
-
 	function cinematX.updateTiming ()
 		local lastFrameTime = cinematX.currentFrameTime
 		cinematX.currentFrameTime = os.clock ()
 		cinematX.deltaTime = cinematX.currentFrameTime - lastFrameTime
 		cinematX.wakeUpWaitingThreads (cinematX.deltaTime)  
 	end
-
 
 	function cinematX.updateScene ()
 
@@ -1103,119 +1076,117 @@ do
 		return pTagStr
 	end
 	
-cinematX.npcCache = {}
+	cinematX.npcCache = {}
 	
-function cinematX.indexActors (onlyIndexNew)
-     
-      -- Loop through every NPC, create an indexed actor instance for each one and store the messages & other info
-      local i = 0
-    
-     -- Swap this for the location to store and read the NPC unique ID. 0x08 appears unused, but this can be changed to any unused word.
-     local idmem = 0x08
+	function cinematX.indexActors (onlyIndexNew)
+		 
+		-- Loop through every NPC, create an indexed actor instance for each one and store the messages & other info
+		local i = 0
+		
+		-- Swap this for the location to store and read the NPC unique ID. 0x08 appears unused, but this can be changed to any unused word.
+		local idmem = 0x08
 
-      for k,v in pairs (npcs()) do
-   
-         local uid = v:mem(idmem, FIELD_WORD);
-         
-         --Validity check message string to ensure we don't follow null pointers.
-         local msgStr = ""
-		if(v:mem (0x4C, FIELD_DWORD) > 0) then msgStr = v.msg.str end
-         
-		 --Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
-         if(uid == 0) then
-            v:mem(idmem, FIELD_WORD, cinematX.actorCount);
-            uid = cinematX.actorCount;
-            cinematX.actorCount = cinematX.actorCount + 1;
-         end
-         
-		 --Have we already defined this actor? If so, then we update the SMBX reference accordingly.
-         if(cinematX.npcCache[uid] ~= nil) then
-			cinematX.npcCache[uid].smbxObjRef = v;
-		 --Otherwise, create a new actor, if necessary.
-         elseif(msgStr ~= nil  and   msgStr ~= "" ) then
-           
-            -- Create the actor and add it to the table
-			local thisActor = Actor.create (v, "NPC")
-			thisActor.messageNew = true   
-            thisActor.messagePointer = v:mem (0x4C, FIELD_DWORD)
-            cinematX.indexedActors[i] = thisActor
-           
-           
-            -- Get the message string
-            thisActor.messageString = msgStr      
-           
-           
-            -- Parse the message string
-            if  (msgStr ~= ""   and   msgStr ~= nil)   then
-               
-               -- Get the substring between the first and last characters
-               local checkStringA = string.sub  (msgStr, 2, string.len(msgStr)-1)
-               -- Get JUST the first and last characters
-               local checkStringB = string.gsub (msgStr, checkStringA, "")
+		for k,v in pairs (npcs()) do
+	   
+			local uid = v:mem(idmem, FIELD_WORD);
+			 
+			--Validity check message string to ensure we don't follow null pointers.
+			local msgStr = ""
+			if(v:mem (0x4C, FIELD_DWORD) > 0) then msgStr = v.msg.str end
+			 
+			--Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
+			if(uid == 0) then
+				v:mem(idmem, FIELD_WORD, cinematX.actorCount);
+				uid = cinematX.actorCount;
+				cinematX.actorCount = cinematX.actorCount + 1;
+			end
+			 
+			--Have we already defined this actor? If so, then we update the SMBX reference accordingly.
+			if(cinematX.npcCache[uid] ~= nil) then
+				cinematX.npcCache[uid].smbxObjRef = v;
+			--Otherwise, create a new actor, if necessary.
+			elseif(msgStr ~= nil  and   msgStr ~= "" ) then
+			   
+				-- Create the actor and add it to the table
+				local thisActor = Actor.create (v, "NPC")
+				thisActor.messageNew = true   
+				thisActor.messagePointer = v:mem (0x4C, FIELD_DWORD)
+				cinematX.indexedActors[i] = thisActor
+			   
+			   
+				-- Get the message string
+				thisActor.messageString = msgStr      
+			   
+			   
+				-- Parse the message string
+				if  (msgStr ~= ""   and   msgStr ~= nil)   then
+				   
+					-- Get the substring between the first and last characters
+					local checkStringA = string.sub  (msgStr, 2, string.len(msgStr)-1)
+					-- Get JUST the first and last characters
+					local checkStringB = string.gsub (msgStr, checkStringA, "")
 
-               -- If this is false, not a valid cinematX message
-               if       (string.find (checkStringA, "[{}]") == nil
-                  and  checkStringB == "{}")  then
+					-- If this is false, not a valid cinematX message
+					if       (string.find (checkStringA, "[{}]") == nil
+							  and  checkStringB == "{}")  then
 
-                  -- Parse tags
-                  local parsedKey       = cinematX.parseTagFromNPCMessage (msgStr, "key")
-                  local parsedName      = cinematX.parseTagFromNPCMessage (msgStr, "name")
-                  local parsedTalkType  = cinematX.parseTagFromNPCMessage (msgStr, "verb")
-                  local parsedIcon      = cinematX.parseTagFromNPCMessage (msgStr, "icon")
-                  local parsedScene     = cinematX.parseTagFromNPCMessage (msgStr, "scene")
-                  local parsedRoutine   = cinematX.parseTagFromNPCMessage (msgStr, "routine")
-                     
-                     
-                  -- Store key for use in getNPCFromKey() if parsed
-                  if (parsedKey ~= nil) then
-                     cinematX.npcMessageKeyIndexes[parsedKey] = i
-                     --windowDebug ("key = "..parsedKey..", "..tostring(cinematX.npcMessageKeyIndexes[parsedKey])..", "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
-                  end
-                 
-                  -- Store name if parsed
-                  if (parsedName == nil) then
-                     parsedName = ""
-                  end
-                  thisActor.nameString = parsedName
-                  
-				  -- Store talk type string if parsed
-                  if (parsedTalkType == nil) then
-                     parsedTalkType = "talk"
-                  end
-                  thisActor.talkTypeString = parsedTalkType
-                 
-                  -- Store icon if parsed
-                  thisActor.wordBubbleIcon = tonumber (parsedIcon)
-                 
-                  -- Store scene
-                  thisActor.sceneString = parsedScene
-                  --windowDebug (thisActor.sceneString)
-                 
-                  -- Store routine
-                  thisActor.routineString = parsedRoutine
-                 
-                  -- Store whether the actor is interactive
-                  if  (parsedRoutine ~= nil   or   parsedScene ~= nil)  then
-                     thisActor.isInteractive = true
-                  end
-               end
-               
-               
-               -- If set to override the SMBX message system, clear the NPC's message after storing it
-               if   (cinematX.overrideNPCMessages == true)   then
-                  local message = msgStr
-                  v.msg:clear()
-                  cinematX.npcCache[uid] = thisActor 
-               end
-           end
-            -- Increment the actor count
-            i = i + 1;
-         end
-         
-      end
-     
-   end
+						-- Parse tags
+						local parsedKey       = cinematX.parseTagFromNPCMessage (msgStr, "key")
+						local parsedName      = cinematX.parseTagFromNPCMessage (msgStr, "name")
+						local parsedTalkType  = cinematX.parseTagFromNPCMessage (msgStr, "verb")
+						local parsedIcon      = cinematX.parseTagFromNPCMessage (msgStr, "icon")
+						local parsedScene     = cinematX.parseTagFromNPCMessage (msgStr, "scene")
+						local parsedRoutine   = cinematX.parseTagFromNPCMessage (msgStr, "routine")
+						 
+						 
+						-- Store key for use in getNPCFromKey() if parsed
+						if (parsedKey ~= nil) then
+							cinematX.npcMessageKeyIndexes[parsedKey] = i
+							--windowDebug ("key = "..parsedKey..", "..tostring(cinematX.npcMessageKeyIndexes[parsedKey])..", "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
+						end
+					 
+						-- Store name if parsed
+						if (parsedName == nil) then
+							parsedName = ""
+						end
+						thisActor.nameString = parsedName
+					  
+						-- Store talk type string if parsed
+						if (parsedTalkType == nil) then
+							parsedTalkType = "talk"
+						end
+						thisActor.talkTypeString = parsedTalkType
 
+						-- Store icon if parsed
+						thisActor.wordBubbleIcon = tonumber (parsedIcon)
+
+						-- Store scene
+						thisActor.sceneString = parsedScene
+						--windowDebug (thisActor.sceneString)
+
+						-- Store routine
+						thisActor.routineString = parsedRoutine
+
+						-- Store whether the actor is interactive
+						if  (parsedRoutine ~= nil   or   parsedScene ~= nil)  then
+							thisActor.isInteractive = true
+						end
+					end
+				   
+				   
+				   -- If set to override the SMBX message system, clear the NPC's message after storing it
+					if   (cinematX.overrideNPCMessages == true)   then
+						local message = msgStr
+						v.msg:clear()
+						cinematX.npcCache[uid] = thisActor 
+					end
+				end
+				
+				-- Increment the actor count
+				i = i + 1;
+            end
+        end
+    end
 	
 	function cinematX.updateActors ()
 		
@@ -1247,7 +1218,6 @@ function cinematX.indexActors (onlyIndexNew)
 		--]]
 
 	end
-
 
 	function cinematX.updateNPCMessages ()
 		cinematX.currentMessageActor = nil
@@ -1327,12 +1297,11 @@ function cinematX.indexActors (onlyIndexNew)
 		end
 	end
 	
-	
+
 	
 	
 	cinematX.memMonitorAddress = 0xAA	
 	cinematX.memMonitorField = 1
-	
 	
 	
 	function cinematX.updateUI ()
@@ -1574,8 +1543,6 @@ function cinematX.indexActors (onlyIndexNew)
 		end
 
 	end
-
-	
 	
 	function cinematX.displayDebug_indexedKeys ()
 		local i = 0
@@ -1596,7 +1563,6 @@ function cinematX.indexActors (onlyIndexNew)
 			printText ("ERROR: INDEXED KEYS NOT FOUND", 4, 20, 120+20*i)
 		end
 	end
-	
 	
 	function cinematX.updateDialog ()
 
@@ -1623,10 +1589,9 @@ function cinematX.indexActors (onlyIndexNew)
 		cinematX.dialogSpeakerTime = cinematX.dialogSpeakerTime - 1
 
 		if(cinematX.dialogSpeakerTime == 0) then
-			cinematX.dialogSpeaker = 0
+			cinematX.dialogSpeaker = nil
 		end		
 	end
-
 
 	-- cinematX-specific cheats
 	function cinematX.updateCheats ()
@@ -1668,7 +1633,6 @@ do
 		cinematX.playerActor.jumpStrength = 17
 		cinematX.playerActor.framesSinceJump = 0
 	end
-
 	
 	function cinematX.onKeyUp (keycode)
 		
@@ -1678,7 +1642,6 @@ do
 			--cinematX.playerActor.jumpStrength = 8
 		end
 	end
-	
 	
 	function cinematX.onKeyDown (keycode)
 		--cinematX.toConsoleLog ("Key pressed: "..tostring(keycode))
@@ -1757,9 +1720,6 @@ do
 		end
 	end
 	
-
-
-
 	function cinematX.unfreezePlayerInput ()
 		cinematX.playerInputActive = true
 	end
@@ -1963,7 +1923,6 @@ do
 
 		cinematX.endCutscene ()
 	end
-
 	
 	function cutscene_LevelStartTest ()
 	
@@ -2000,7 +1959,6 @@ end
 
  
  
- 
 --***************************************************************************************************
 --                                                                       		                    *
 -- 				DIALOGUE MANAGEMENT																	*
@@ -2016,36 +1974,30 @@ do
 		cinematX.setDialogInputWait (needInput)
 		cinematX.setDialogSpeed (textSpeed)
 	end
-
 	
 	function cinematX.setDialogSpeed (textSpeed)
 		cinematX.dialogTextSpeed = textSpeed
 	end
 
-
 	function cinematX.setDialogSkippable (skippable)
 		cinematX.dialogSkippable = skippable
 	end	
-
 	
 	function cinematX.setDialogInputWait (needInput)
 		cinematX.dialogEndWithInput = needInput
 	end
-
 	
-	function cinematX.startQuestion (speaker, name, text, textTime, speakTime, sound)
-		cinematX.startDialog (speaker, name, text, textTime, speakTime, sound)
+	function cinematX.startQuestion (speakerActor, name, text, textTime, speakTime, sound)
+		cinematX.startDialog (speakerActor, name, text, textTime, speakTime, sound)
 		cinematX.dialogIsQuestion = true
 		cinematX.questionPlayerResponse = nil
 	end
-
 
 	function cinematX.getResponse ()
 		return cinematX.questionPlayerResponse
 	end
 	
-	
-	function cinematX.startDialog (speaker, name, text, textTime, speakTime, sound)
+	function cinematX.startDialog (speakerActor, name, text, textTime, speakTime, sound)
 		--windowDebug ("TEST C")
 				
 		-- Voice clip
@@ -2054,27 +2006,24 @@ do
 		end
 		
 		--NPC speaking animation
-		if   speaker ~= -1   then
-			cinematX.triggerDialogSpeaker (speaker, speakTime)
+		if   (speakerActor ~= nil  and  speakerActor ~= -1)   then
+			cinematX.triggerDialogSpeaker (speakerActor, speakTime)
 		end
 		
 		cinematX.triggerDialogText (name, text, textTime)
 		cinematX.dialogOn = true
 	end
-
 	
-	function cinematX.triggerDialogSpeaker (npcid, timeVal)
-		cinematX.dialogSpeaker = npcid
+	function cinematX.triggerDialogSpeaker (speakerActor, timeVal)
+		cinematX.dialogSpeaker = speakerActor
 		cinematX.dialogSpeakerTime = timeVal
 	end
 
-	
 	function cinematX.triggerDialogText (name,text,textTime)
 		cinematX.dialogName = name
 		cinematX.dialogTextFull = text
 		cinematX.dialogTextTime = textTime
 	end
-	
 	
 	function cinematX.endDialogLine ()
 		cinematX.dialogOn = false
@@ -2090,14 +2039,12 @@ do
 		cinematX.signal ("endDialog")
 	end
 
-
 	function cinematX.displayNPCSubtitle (name, text)
 		--cinematX.dialogOn = true
 		cinematX.printCenteredText (name, 4, 400, 500)
 		cinematX.printCenteredText (text, 4, 400, 520)
 	end
 	
-
 	function cinematX.processNPCMessage (npcIndex)
 		
 		-- Parse the NPC's message
@@ -2131,7 +2078,6 @@ do
 		end
 	end
 	
-
 	cinematX.playerNameASXT = function ()
 		return cinematX.playerNames ("Demo", "Iris", "Kood", "raocow", "Sheath")
 	end
@@ -2162,7 +2108,6 @@ do
 		end
 	end
 	
-	
 	function cinematX.printCenteredText (text, font, xPos, yPos)
 	    if text ~= nil then
 		    printText (text, font, xPos-9 * string.len(text), yPos)
@@ -2190,15 +2135,13 @@ do
 		cinematX.runCoroutine (func)
 	end
 	
-	
 	function cinematX.getBattleProgress ()
 		return cinematX.bossHP
 	end
 	
 	function cinematX.getBattleProgressPercent ()
 		return (cinematX.bossHPMax - cinematX.bossHP) / cinematX.bossHPMax
-	end
-	
+	end	
 	
 	function cinematX.setBattleProgress (amount)
 		cinematX.bossHP = cinematX.bossHP - amount
@@ -2207,11 +2150,9 @@ do
 			cineatX.winBattle ()
 		end
 	end
-	
-	
+		
 	function cinematX.winBattle ()
 	end
-	
 	
 	function cinematX.loseBattle ()
 	end
@@ -2246,7 +2187,6 @@ do
 		cinematX.questDescr[questKey] = missionText
 	end
 
-
 	function cinematX.displayQuestState (questKey)
 		local tempState = cinematX.getQuestState (questKey)
 		
@@ -2279,7 +2219,6 @@ do
 			cinematX.setQuestDescription (questKey, newMessage)
 		end
 	end
-
 	
 	function cinematX.initQuest (questKey)
 		cinematX.setQuestState (questKey, 0)
@@ -2325,7 +2264,6 @@ end
 --***************************************************************************************************
 
 do
-
 	cinematX.tempPlayerX = 0
 	cinematX.tempPlayerY = 0
 	cinematX.tempPlayerXSpeed = 0
@@ -2340,9 +2278,7 @@ do
 		cinematX.tempPlayerYSpeed = player.speedY
 		cinematX.tempPlayerPowerup = player.powerup
 		cinematX.tempPlayerState = player:mem (0x112, FIELD_WORD)
-	
-	end
-	
+	end	
 	
 	function cinematX.restorePlayerPosition ()
 		player.x = cinematX.tempPlayerX
@@ -2352,7 +2288,6 @@ do
 		player.powerup = cinematX.tempPlayerPowerup
 		player:mem (0x112, FIELD_WORD, cinematX.tempPlayerState)
 	end
-
 	
 	function cinematX.enterCameraMode ()
 		cinematX.savePlayerPosition ()
@@ -2361,13 +2296,11 @@ do
 		cinematX.cameraControlOn = true
 	end
 	
-	
 	function cinematX.exitCameraMode ()
 			cinematX.cameraControlOn = false
 			player:mem (0x112, FIELD_WORD, 0)
 			cinematX.restorePlayerPosition ()
 	end
-
 	
 	function cinematX.runCutscene (func)
 		cinematX.changeSceneMode (cinematX.SCENESTATE_CUTSCENE)
@@ -2381,19 +2314,16 @@ do
 		--cinematX.exitCameraMode ()
 	end
 	
-	
 	function cinematX.cycleSceneMode ()
 		cinematX.changeSceneMode ((cinematX.currentSceneState + 1) % 3)
 	end
-	
-	
+		
 	function cinematX.changeSceneMode (sceneModeType)	
 		cinematX.currentSceneState = sceneModeType
 		cinematX.refreshHUDOverlay ()
 		--windowDebug ("SWITCH TO STATE "..cinematX.currentSceneState)
 
 	end
-	
 	
 	function cinematX.refreshHUDOverlay ()
 		-- Enable the hud
@@ -2430,9 +2360,7 @@ do
 		end
 	end
 	
-	
 	function cinematX.changeHudOverlay (imageName)
-		
 		
 		if   (cinematX.currentHudOverlay  ~=  imageName)   then
 			-- Hud box
@@ -2464,7 +2392,6 @@ do
 		cinematX.debugLogTable[cinematX.debugCurrentLine] = text
 		cinematX.debugCurrentLine = cinematX.debugCurrentLine + 1
 	end
-
 	
 	function cinematX.displayDebugText (text)
 		if  (cinematX.showDebugInfo == true)  then
@@ -2578,120 +2505,4 @@ do
 end
 
 	
---***************************************************************************************************
---                                                                       		                    *
--- 				ACTOR COMMANDS																		*
---                                                                                                  *
---***************************************************************************************************
-
-do
-	-- Relational stuff
-	do
-
-	
-	end	 
-end
-	
-	
-	
--- MESSY STUFF UNCOMMENT AT YOUR OWN PERIL
---[[
-do
-
-	
-
-
-	-- Player stuff --
-	do 
-		Player:charindex = function ()
-		  return self:mem (0xF0, FIELD_WORD)
-		end
-		 
-		 
-		Player:charNameSet = function (marioName, luigiName, peachName, toadName, linkName)
-		  local indexVal = self.charindex
-		 
-		  if      indexVal == 0  then
-			return "NONE"
-		  elseif  indexVal == 1  then
-			return marioName
-		  elseif  indexVal == 2  then
-			return luigiName
-		  elseif  indexVal == 3  then
-			return peachName
-		  elseif  indexVal == 5  then
-			return linkName
-		  else
-			return toadName
-		  end
-		end
-		 
-		 
-		Player:charname = function ()
-		  return self.charNameSet ("Mario", "Luigi", "Peach", "Toad", "Link")
-		end
-		 
-		Player:charnameASXT = function ()
-		  return self.charNameSet ("Demo", "Iris", "Kood", "raocow", "Sheath")
-		end
-		 
-		Player:charnameASXT2 = function ()
-		  return self.charNameSet ("Nevada", "Pily", "Alt P3", "Alt P4", "Broadsword")
-		end
-	end
-
-
-
-
-
-		 
-		 
-		 
-
-		 
-		-- Player member variables
-
-
-		Player:charindex = function ()
-		  return self:mem (0xF0, FIELD_WORD)
-		end
-		 
-		 
-		Player:charNameSet = function (marioName, luigiName, peachName, toadName, linkName)
-		  local indexVal = self.charindex
-		 
-		  if      indexVal == 0  then
-			return "NONE"
-		  elseif  indexVal == 1  then
-			return marioName
-		  elseif  indexVal == 2  then
-			return luigiName
-		  elseif  indexVal == 3  then
-			return peachName
-		  elseif  indexVal == 5  then
-			return linkName
-		  else
-			return toadName
-		  end
-		end
-		 
-		 
-		Player:charname = function ()
-		  return self.charNameSet ("Mario", "Luigi", "Peach", "Toad", "Link")
-		end
-		 
-		Player:charnameASXT = function ()
-		  return self.charNameSet ("Demo", "Iris", "Kood", "raocow", "Sheath")
-		end
-		 
-		Player:charnameASXT2 = function ()
-		  return self.charNameSet ("Nevada", "Pily", "Alt P3", "Alt P4", "Broadsword")
-		end
-
-end
---]]
-
-
-
- 
 return cinematX

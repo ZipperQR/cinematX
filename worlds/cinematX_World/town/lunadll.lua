@@ -12,16 +12,9 @@ NPCID = loadSharedAPI("npcid")
 do
 
 	-- NPC ID enums
-	NPCID_BROADSWORD = 101
 	NPCID_CALLEOCA = 94
-	NPCID_DONUTGEN = 211
-	NPCID_SHOCKWAVEGEN = 206
-	NPCID_COLLISIONA = 136 
-	NPCID_COLLISIONB = 137 
 
 	-- Sound IDs
-	SOUNDID_DRAWSWORD = "sword1.wav"
-	SOUNDID_SLICE = "sword2.wav"
 	VOICEID_CAL_01 = "voice_calleoca_01.wav"
 	VOICEID_CAL_02 = "voice_calleoca_02.wav"
 	VOICEID_CAL_03 = "voice_calleoca_03.wav"
@@ -98,7 +91,7 @@ do
 		
 		
 		-- Calleoca speaks
-		cinematX.startDialog  (NPCID_BROADSWORD, "Calleoca", "Hey, sis! I'mma follow you around a bit,  hope you don't mind!", 30, 30, "")
+		cinematX.startDialog  (calleocaActor, "Calleoca", "Hey, sis! I'mma follow you around a bit,  hope you don't mind!", 30, 30, "")
 		cinematX.waitForDialog ()
 		
 		-- Calleoca starts following the player
@@ -112,12 +105,15 @@ do
 
 	
 	function cutscene_Welcome ()
+		
+		goopaActor = cinematX.getActorFromKey("goopa1")
+		goopaActorName = cinematX.getActorName_Key("goopa1")
 	
 		-- Configure dialogue
 		cinematX.setDialogSkippable (true)
 		cinematX.setDialogInputWait (true)
 	
-		cinematX.startDialog  (NPCID_BROADSWORD, cinematX.getActorName_Key("goopa1"), "Welcome to our humble village! Please     enjoy your stay!", 140, 120, "")
+		cinematX.startDialog  (goopaActor, goopaActorName, "Welcome to our humble village! Please     enjoy your stay!", 140, 120, "")
 		cinematX.waitForDialog ()
 	
 		cinematX.endCutscene ()
