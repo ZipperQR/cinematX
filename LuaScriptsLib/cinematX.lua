@@ -544,10 +544,19 @@ do
 		end
 		
 		
-		-- Prevent despawning  --NPCMemSet,NPC ID,0x12A,55,0,0,w, thanks Willhart!
+		-- Prevent despawning  --NPCMemSet,NPC ID,0x12A,55,0,0,w, thanks Wilhart!
 		if (self.shouldDespawn == false) then
 			self.smbxObjRef:mem (0x12A, FIELD_WORD, 55)
 		end
+		
+		
+		-- Check whether or not the NPC is despawned
+		self.isDespawned = true
+
+		if (self.smbxObjRef:mem (0x12A, FIELD_WORD) == 55) then
+			self.isDespawned = false
+		end
+		
 		
 		-- Old method of preventing despawning
 		--[[
