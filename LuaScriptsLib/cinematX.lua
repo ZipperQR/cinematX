@@ -1115,7 +1115,10 @@ function cinematX.indexActors (onlyIndexNew)
       for k,v in pairs (npcs()) do
    
          local uid = v:mem(idmem, FIELD_WORD);
-         local msgStr = v.msg.str
+         
+         --Validity check message string to ensure we don't follow null pointers.
+         local msgStr = ""
+	 if(v:mem (0x4C, FIELD_DWORD) > 0) then msgStr = v.msg.str end
          
 		 --Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
          if(uid == 0) then
