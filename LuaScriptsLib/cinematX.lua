@@ -476,7 +476,7 @@ do
 		
 		function Actor:jump (strength)
 			self:setSpeedY (-1 * strength)
-			playSFX(1)	
+			playSFXSDL (1)	
 			self.framesSinceJump = 0
 			self.jumpStrength = strength
 		end
@@ -585,7 +585,7 @@ do
 			if  self:distanceActorX (cinematX.playerActor) < 64  then
 				if (self.saidHello == false  and  self.helloCooldown <= 0) then
 					if  (self.helloVoice ~= "")  then
-						playSFX (self.helloVoice)
+						playSFXSDL (self.helloVoice)
 					end
 					self.saidHello = true
 				end
@@ -595,7 +595,7 @@ do
 			elseif  (self:distanceActorX (cinematX.playerActor) < 400)  then
 				if  (self.saidHello == true)  then
 					if  (self.goodbyeVoice ~= "")  then
-						playSFX (self.goodbyeVoice)
+						playSFXSDL (self.goodbyeVoice)
 					end
 					self.saidHello = false
 					self.helloCooldown = 300
@@ -1617,7 +1617,7 @@ do
 		
 		if  (string.find (tempStr, cheatString..""))  then
 			cinematX.showConsole = false
-			playSFX (0)
+			playSFXSDL (0)
 			isTrue = true
 			getInput():clear ()
 		end
@@ -1663,12 +1663,12 @@ do
 			if  (cinematX.dialogIsQuestion == true)  then
 				if (keycode == KEY_LEFT) then
 					cinematX.questionPlayerResponse = true
-					playSFX(3)
+					playSFXSDL (3)
 				end
 			
 				if (keycode == KEY_RIGHT) then
 					cinematX.questionPlayerResponse = false
-					playSFX(3)
+					playSFXSDL (3)
 				end
 			end
 			
@@ -1684,9 +1684,9 @@ do
 				elseif  (cinematX.dialogEndWithInput == true)   then
 				
 					if  (cinematX.dialogIsQuestion == true  and  cinematX.questionPlayerResponse == nil)  then
-						playSFX(10) -- 10 = skid, 14 = coin, 23 = shckwup
+						playSFXSDL (10) -- 10 = skid, 14 = coin, 23 = shckwup
 					else
-						playSFX(23) -- 10 = skid, 14 = coin, 23 = shckwup
+						playSFXSDL (23) -- 10 = skid, 14 = coin, 23 = shckwup
 						cinematX.endDialogLine ()
 					end
 				end
@@ -2011,7 +2011,7 @@ do
 				
 		-- Voice clip
 		if  cinematX.dialogOn == false  and  sound ~= ""  then
-			playSFX (sound)
+			playSFXSDL (sound)
 		end
 		
 		--NPC speaking animation
@@ -2100,7 +2100,7 @@ do
 	end
 	
 	function cinematX.playerNames (marioName, luigiName, peachName, toadName, linkName)
-		local indexVal = player.identity
+		local indexVal = player:mem(0xF0, FIELD_WORD) --player.Identity
 
 		if      indexVal == 0  then
 			return "NONE"
