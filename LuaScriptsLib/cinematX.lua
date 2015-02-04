@@ -544,7 +544,7 @@ do
 		end
 		
 		
-		-- Prevent despawning  --NPCMemSet,NPC ID,0x12A,55,0,0,w, thanks Wilhart!
+		-- Prevent despawning  --NPCMemSet,NPC ID,0x12A,55,0,0,w, thanks Willhart!
 		if (self.shouldDespawn == false) then
 			self.smbxObjRef:mem (0x12A, FIELD_WORD, 55)
 		end
