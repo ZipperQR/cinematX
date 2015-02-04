@@ -673,8 +673,8 @@ end
 --***************************************************************************************************
 
 do
-	cinematX.overrideNPCMessages = true
-	cinematX.showDebugInfo = false
+	cinematX.overrideNPCMessages = false
+	cinematX.showDebugInfo = true--false
 	
 	function cinematX.config (toggleOverrideMsg, showDebug)
 		cinematX.overrideNPCMessages = toggleOverrideMsg
@@ -1102,96 +1102,108 @@ do
 		return pTagStr
 	end
 	
+cinematX.npcCache = {}
 	
-	function cinematX.indexActors (onlyIndexNew)
-		
-		-- Loop through every NPC, create an indexed actor instance for each one and store the messages & other info
-		local i = 0
+function cinematX.indexActors (onlyIndexNew)
+     
+      -- Loop through every NPC, create an indexed actor instance for each one and store the messages & other info
+      local i = 0
+    
+     -- Swap this for the location to store and read the NPC unique ID. 0x08 appears unused, but this can be changed to any unused word.
+     local idmem = 0x08
 
-		for k,v in pairs (npcs()) do
-						
-			i = cinematX.actorCount
-			
-			-- If the NPC was created this frame, index them
-			if (v:mem (0x136, FIELD_WORD) == 0xFFFF   or   onlyIndexNew == false)    and
-			   (v.msg.str ~= nil  and   v.msg.str ~= "")
-				then
-				
-				
-				-- Create the actor and add it to the table
-				local thisActor = Actor.create (v, "NPC")
-				thisActor.messagePointer = v:mem (0x4C, FIELD_DWORD)
-				cinematX.indexedActors[i] = thisActor
-				
-				
-				-- Get the message string
-				local msgStr = v.msg.str
-				thisActor.messageString = msgStr
-				thisActor.messageNew = true				
-				
-				
-				-- Parse the message string
-				if  (msgStr ~= ""   and   msgStr ~= nil)   then
-					
-					-- Get the substring between the first and last characters
-					local checkStringA = string.sub  (msgStr, 2, string.len(msgStr)-1)
-					-- Get JUST the first and last characters
-					local checkStringB = string.gsub (msgStr, checkStringA, "")
+      for k,v in pairs (npcs()) do
+   
+         local uid = v:mem(idmem, FIELD_WORD);
+         local msgStr = v.msg.str
+         
+		 --Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
+         if(uid == 0) then
+            v:mem(idmem, FIELD_WORD, cinematX.actorCount);
+            uid = cinematX.actorCount;
+            cinematX.actorCount = cinematX.actorCount + 1;
+         end
+         
+		 --Have we already defined this actor? If so, then we update the SMBX reference accordingly.
+         if(cinematX.npcCache[uid] ~= nil) then
+			cinematX.npcCache[uid].smbxObjRef = v;
+		 --Otherwise, create a new actor, if necessary.
+         elseif(msgStr ~= nil  and   msgStr ~= "" ) then
+           
+            -- Create the actor and add it to the table
+			local thisActor = Actor.create (v, "NPC")
+			thisActor.messageNew = true   
+            thisActor.messagePointer = v:mem (0x4C, FIELD_DWORD)
+            cinematX.indexedActors[i] = thisActor
+           
+           
+            -- Get the message string
+            thisActor.messageString = msgStr      
+           
+           
+            -- Parse the message string
+            if  (msgStr ~= ""   and   msgStr ~= nil)   then
+               
+               -- Get the substring between the first and last characters
+               local checkStringA = string.sub  (msgStr, 2, string.len(msgStr)-1)
+               -- Get JUST the first and last characters
+               local checkStringB = string.gsub (msgStr, checkStringA, "")
 
-					-- If this is false, not a valid cinematX message
-					if 		(string.find (checkStringA, "[{}]") == nil
-						and  checkStringB == "{}")  then
+               -- If this is false, not a valid cinematX message
+               if       (string.find (checkStringA, "[{}]") == nil
+                  and  checkStringB == "{}")  then
 
-						-- Parse tags
-						local parsedKey     = cinematX.parseTagFromNPCMessage (msgStr, "key")
-						local parsedName    = cinematX.parseTagFromNPCMessage (msgStr, "name")
-						local parsedIcon    = cinematX.parseTagFromNPCMessage (msgStr, "icon")
-						local parsedScene   = cinematX.parseTagFromNPCMessage (msgStr, "scene")
-						local parsedRoutine = cinematX.parseTagFromNPCMessage (msgStr, "routine")
-							
-							
-						-- Store key for use in getNPCFromKey() if parsed
-						if (parsedKey ~= nil) then
-							cinematX.npcMessageKeyIndexes[parsedKey] = i
-							--windowDebug ("key = "..parsedKey..", "..tostring(cinematX.npcMessageKeyIndexes[parsedKey])..", "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
-						end
-						
-						-- Store name if parsed
-						if (parsedName == nil) then
-							parsedName = "UNNAMED NPC"
-						end
-						thisActor.nameString = parsedName
-						
-						-- Store icon if parsed
-						thisActor.wordBubbleIcon = tonumber (parsedIcon)
-						
-						-- Store scene
-						thisActor.sceneString = parsedScene
-						--windowDebug (thisActor.sceneString)
-						
-						-- Store routine
-						thisActor.routineString = parsedRoutine
-						
-						-- Store whether the actor is interactive
-						if  (parsedRoutine ~= nil   or   parsedScene ~= nil)  then
-							thisActor.isInteractive = true
-						end
-					end
-					
-					
-					-- If set to override the SMBX message system, clear the NPC's message after storing it
-					if   (cinematX.overrideNPCMessages == true)   then
-						v.msg:clear()
-					end
-				end
-				
-				-- Increment the actor count
-				cinematX.actorCount = cinematX.actorCount + 1
-			end
-			
-		end
-		--windowDebug ("Is this deleted? "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
-	end
+                  -- Parse tags
+                  local parsedKey     = cinematX.parseTagFromNPCMessage (msgStr, "key")
+                  local parsedName    = cinematX.parseTagFromNPCMessage (msgStr, "name")
+                  local parsedIcon    = cinematX.parseTagFromNPCMessage (msgStr, "icon")
+                  local parsedScene   = cinematX.parseTagFromNPCMessage (msgStr, "scene")
+                  local parsedRoutine = cinematX.parseTagFromNPCMessage (msgStr, "routine")
+                     
+                     
+                  -- Store key for use in getNPCFromKey() if parsed
+                  if (parsedKey ~= nil) then
+                     cinematX.npcMessageKeyIndexes[parsedKey] = i
+                     --windowDebug ("key = "..parsedKey..", "..tostring(cinematX.npcMessageKeyIndexes[parsedKey])..", "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
+                  end
+                 
+                  -- Store name if parsed
+                  if (parsedName == nil) then
+                     parsedName = "UNNAMED NPC"
+                  end
+                  thisActor.nameString = parsedName
+                 
+                  -- Store icon if parsed
+                  thisActor.wordBubbleIcon = tonumber (parsedIcon)
+                 
+                  -- Store scene
+                  thisActor.sceneString = parsedScene
+                  --windowDebug (thisActor.sceneString)
+                 
+                  -- Store routine
+                  thisActor.routineString = parsedRoutine
+                 
+                  -- Store whether the actor is interactive
+                  if  (parsedRoutine ~= nil   or   parsedScene ~= nil)  then
+                     thisActor.isInteractive = true
+                  end
+               end
+               
+               
+               -- If set to override the SMBX message system, clear the NPC's message after storing it
+               if   (cinematX.overrideNPCMessages == true)   then
+                  local message = msgStr
+                  v.msg:clear()
+                  cinematX.npcCache[uid] = thisActor 
+               end
+           end
+            -- Increment the actor count
+            i = i + 1;
+         end
+         
+      end
+     
+   end
 
 	
 	function cinematX.updateActors ()
@@ -1240,6 +1252,8 @@ do
 				--if cinematX.playerActor ~= nil then
 				--	windowDebug ("SHOULD BE NO PROBLEM")
 				--end
+				
+				
 				if  (v ~= nil)  then
 					if  (v.smbxObjRef ~= nil)  then
 						if  (v:distanceActor (cinematX.playerActor) < 800   and   
@@ -1360,7 +1374,9 @@ do
 		-- DISPLAY DIALOGUE/SUBTITLES
 		if   cinematX.dialogOn == true  and  (cinematX.currentSceneState == cinematX.SCENESTATE_PLAY  or  cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE) then
 
+			if(cinematX.dialogName ~= "") then
 			printText (cinematX.dialogName..":", 4, 5, 475)  
+			end
 			printText (string.sub (cinematX.dialogText, 1, 42), 4, 15, 495)
 			printText (string.sub (cinematX.dialogText, 43, 85), 4, 15, 515)
 			
@@ -2333,26 +2349,22 @@ do
 	
 	
 	function cinematX.exitCameraMode ()
-		cinematX.cameraControlOn = false
-		player:mem (0x112, FIELD_WORD, 0)
-		cinematX.restorePlayerPosition ()
+			cinematX.cameraControlOn = false
+			player:mem (0x112, FIELD_WORD, 0)
+			cinematX.restorePlayerPosition ()
 	end
-
-
-
 
 	
 	function cinematX.runCutscene (func)
 		cinematX.changeSceneMode (cinematX.SCENESTATE_CUTSCENE)
-		--cinematX.enterCameraMode ()
+		cinematX.enterCameraMode ()
 		
 		return cinematX.runCoroutine (func)
 	end
 
-	
 	function cinematX.endCutscene ()
 		cinematX.changeSceneMode (cinematX.SCENESTATE_PLAY)
-		--cinematX.exitCameraMode ()
+		cinematX.exitCameraMode ()
 	end
 	
 	
