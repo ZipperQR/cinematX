@@ -22,7 +22,7 @@ end
 --              CONSTANTS AND ENUMS															    	*
 --                                                                                                  *
 --***************************************************************************************************
-do
+do	
 	-- Resource path
 	cinematX.resourcePath = "..\\..\\..\\LuaScriptsLib\\cinematX\\"
 
@@ -476,7 +476,7 @@ do
 		
 		function Actor:jump (strength)
 			self:setSpeedY (-1 * strength)
-			playSFXSDL (1)	
+			playSFX (1)	
 			self.framesSinceJump = 0
 			self.jumpStrength = strength
 		end
@@ -698,12 +698,13 @@ do
 		-- Prevent this function from being called twice
 		if  (cinematX.initCalledYet == true)  then  return  end
 	
-		-- Call all of the sub init functions
+		-- Call all of the sub init functions	
 		cinematX.initTiming ()
 		cinematX.initHUD ()
 		cinematX.initCamera ()
 		cinematX.initDialog ()
 		cinematX.initCutscene ()
+		cinematX.initRace ()
 		cinematX.initBoss ()
 		cinematX.initQuestSystem ()
 		cinematX.initDebug ()
@@ -870,10 +871,27 @@ do
 		cinematX.SCENESTATE_PLAY = 0
 		cinematX.SCENESTATE_CUTSCENE = 1
 		cinematX.SCENESTATE_BATTLE = 2
+		cinematX.SCENESTATE_RACE = 3
 
 		cinematX.changeSceneMode (cinematX.SCENESTATE_PLAY)
 	end
 
+	function cinematX.initRace ()
+		-- The opponent in a race
+		cinematX.raceEnemyActor = nil
+		
+		cinematX.raceActive = false
+		cinematX.raceWinRoutine = nil
+		cinematX.raceLoseRoutine = nil
+		
+		cinematX.raceStartX = nil
+		cinematX.raceEndX = nil
+		
+		cinematX.racePlayerPos = 0.000000
+		cinematX.raceEnemyPos = 0.000000		
+	end
+	
+	
 	function cinematX.initBoss ()
 		-- Current attack pattern time in frames
 		cinematX.battleFrame = 0  
@@ -885,7 +903,7 @@ do
 		cinematX.bossAttackPattern = 0
 
 		-- Name for boss' HP bar
-		cinematX.bossName = "Augustus Leopold Broadsword Esq. III"
+		cinematX.bossName = "BOSS NAME"
 
 		-- Boss HP
 		cinematX.bossHPMax = 8
@@ -911,6 +929,10 @@ do
 		cinematX.IMGSLOT_NPCICON_Q_N		=	999993
 		cinematX.IMGSLOT_NPCICON_PRESSUP	=	999992
 		
+		cinematX.IMGSLOT_RACEOPPONENT		=	999991
+		cinematX.IMGSLOT_RACEPLAYER			=	999990
+		
+		
 		-- Color code constants
 		cinematX.COLOR_TRANSPARENT = 0xFFFFFF--0xFB009D
 		
@@ -924,6 +946,10 @@ do
 		cinematX.IMGNAME_BOSSHP_EMPTY 			= 	cinematX.resourcePath.."bossHP_midE.bmp"
 		cinematX.IMGNAME_BOSSHP_FULL 			=	cinematX.resourcePath.."bossHP_midF.bmp"
 		cinematX.IMGNAME_BOSSHP_BG 				=	cinematX.resourcePath.."bossHP_bg.bmp"
+		
+		cinematX.IMGNAME_RACEBG 				=	cinematX.resourcePath.."raceBg.bmp"
+		cinematX.IMGNAME_RACEPLAYER				=	cinematX.resourcePath.."racePlayer.bmp"
+		cinematX.IMGNAME_RACEOPPONENT			=	cinematX.resourcePath.."raceOpponent.bmp"
 		
 		cinematX.IMGNAME_HUDBOX					=	cinematX.resourcePath.."hudBox.bmp"
 		
@@ -950,6 +976,10 @@ do
 		loadImage (cinematX.IMGNAME_NPCICON_QUEST_O,  cinematX.IMGSLOT_NPCICON_Q_O,  cinematX.COLOR_TRANSPARENT)
 		loadImage (cinematX.IMGNAME_NPCICON_QUEST_N,  cinematX.IMGSLOT_NPCICON_Q_N,  cinematX.COLOR_TRANSPARENT)
 		loadImage (cinematX.IMGNAME_NPCICON_PRESSUP,  cinematX.IMGSLOT_NPCICON_PRESSUP,  cinematX.COLOR_TRANSPARENT)
+		
+		--loadImage (cinematX.IMGNAME_RACEBG,  		cinematX.IMGSLOT_RACEBG,	  	cinematX.COLOR_TRANSPARENT)
+		loadImage (cinematX.IMGNAME_RACEOPPONENT,	cinematX.IMGSLOT_RACEOPPONENT,  cinematX.COLOR_TRANSPARENT)
+		loadImage (cinematX.IMGNAME_RACEPLAYER,  	cinematX.IMGSLOT_RACEPLAYER,  	cinematX.COLOR_TRANSPARENT)
 	end
 	
 	function cinematX.initActors ()
@@ -1022,6 +1052,7 @@ do
 		cinematX.updateActors ()
 		cinematX.updateNPCMessages ()
 		cinematX.updateDialog ()
+		cinematX.updateRace ()
 		cinematX.updateUI ()
 		cinematX.updateCheats ()
 		--cinematX.updateInput ()
@@ -1306,6 +1337,39 @@ do
 		end
 	end
 	
+	
+	
+	function cinematX.updateRace ()
+		if  (cinematX.raceEnemyActor ~= nil
+		and  cinematX.raceActive == true) 
+		then
+		
+			-- Calculate relative position of player and opponent
+			cinematX.racePlayerPos = invLerp (cinematX.raceStartX, cinematX.raceEndX, cinematX.playerActor:getX ())
+			cinematX.raceEnemyPos = invLerp (cinematX.raceStartX, cinematX.raceEndX, cinematX.raceEnemyActor:getX ())		
+			
+			--[[
+			printText (tostring(cinematX.racePlayerPos), 4, 5, 300)
+			printText (tostring(cinematX.raceEnemyPos), 4, 5, 320)
+			
+			printText (tostring(cinematX.raceStartX), 4, 5, 340)
+			printText (tostring(cinematX.raceEndX), 4, 5, 360)
+			printText (tostring(cinematX.playerActor:getX ()), 4, 5, 380)
+			printText (tostring(cinematX.raceEnemyActor:getX ()), 4, 5, 400)
+			--]]
+			
+			-- Call win/lose coroutines
+			if (cinematX.racePlayerPos >= 1) then
+				cinematX.raceActive = false
+				cinematX.runCoroutine (cinematX.raceWinRoutine)
+			end
+			
+			if (cinematX.raceEnemyPos >= 1) then
+				cinematX.raceActive = false
+				cinematX.runCoroutine (cinematX.raceLoseRoutine)
+			end
+		end
+	end
 
 	
 	
@@ -1320,8 +1384,25 @@ do
 		-- MAIN HUD OVERLAY IS CHANGED WHEN cinematX.refreshHUDOverlay () IS CALLED
 		-- BELOW ARE ADDITIONAL UI ELEMENTS BASED ON THE SCENE STATE
 		
+		-- RACE PROGRESS
+		if   cinematX.currentSceneState == cinematX.SCENESTATE_RACE   then
+			local raceMeterLeft = 56
+			local raceMeterRight = 800-72
+			local racePlayerIconX = lerp (raceMeterLeft, raceMeterRight, cinematX.racePlayerPos)
+			local raceEnemyIconX = lerp (raceMeterLeft, raceMeterRight, cinematX.raceEnemyPos)
+			local barY = 520
+			
+			if (racePlayerIconX > raceEnemyIconX)  then
+				placeSprite (1, cinematX.IMGSLOT_RACEOPPONENT,    raceEnemyIconX, barY, "", 2)
+				placeSprite (1, cinematX.IMGSLOT_RACEPLAYER,    racePlayerIconX, barY, "", 2)
+			else
+				placeSprite (1, cinematX.IMGSLOT_RACEPLAYER,    racePlayerIconX, barY, "", 2)
+				placeSprite (1, cinematX.IMGSLOT_RACEOPPONENT,    raceEnemyIconX, barY, "", 2)			
+			end
+		end
+			
 		-- BOSS HP BAR
-		if   cinematX.currentSceneState == cinematX.SCENESTATE_BATTLE   then
+		if  cinematX.currentSceneState == cinematX.SCENESTATE_BATTLE   then
 
 			-- Boss Name
 			cinematX.printCenteredText (cinematX.bossName, 4, 400, 500)
@@ -1617,7 +1698,7 @@ do
 		
 		if  (string.find (tempStr, cheatString..""))  then
 			cinematX.showConsole = false
-			playSFXSDL (0)
+			playSFX (0)
 			isTrue = true
 			getInput():clear ()
 		end
@@ -1663,12 +1744,12 @@ do
 			if  (cinematX.dialogIsQuestion == true)  then
 				if (keycode == KEY_LEFT) then
 					cinematX.questionPlayerResponse = true
-					playSFXSDL (3)
+					playSFX (3)
 				end
 			
 				if (keycode == KEY_RIGHT) then
 					cinematX.questionPlayerResponse = false
-					playSFXSDL (3)
+					playSFX (3)
 				end
 			end
 			
@@ -1684,9 +1765,9 @@ do
 				elseif  (cinematX.dialogEndWithInput == true)   then
 				
 					if  (cinematX.dialogIsQuestion == true  and  cinematX.questionPlayerResponse == nil)  then
-						playSFXSDL (10) -- 10 = skid, 14 = coin, 23 = shckwup
+						playSFX (10) -- 10 = skid, 14 = coin, 23 = shckwup
 					else
-						playSFXSDL (23) -- 10 = skid, 14 = coin, 23 = shckwup
+						playSFX (23) -- 10 = skid, 14 = coin, 23 = shckwup
 						cinematX.endDialogLine ()
 					end
 				end
@@ -2133,6 +2214,22 @@ end
 --***************************************************************************************************
 
 do
+	function cinematX.beginRace (otherActor, startX, endX, raceFunc, loseFunc, winFunc)
+		
+		cinematX.raceEnemyActor = otherActor
+		cinematX.raceStartX = startX
+		cinematX.raceEndX = endX
+		
+		cinematX.raceLoseRoutine = loseFunc
+		cinematX.raceWinRoutine = winFunc
+		
+		cinematX.changeSceneMode (cinematX.SCENESTATE_RACE)		
+		cinematX.raceActive = true
+		
+		cinematX.runCoroutine (raceFunc)
+	end
+	
+	
 	function cinematX.beginBattle (name, hits, barType, func)
 		cinematX.bossName = name
 		
@@ -2140,6 +2237,7 @@ do
 		cinematX.bossHP = cinematX.bossHPMax
 		
 		cinematX.bossHPDisplayType = barType
+		cinematX.changeSceneMode (cinematX.SCENESTATE_BATTLE)
 		
 		cinematX.runCoroutine (func)
 	end
@@ -2324,7 +2422,7 @@ do
 	end
 	
 	function cinematX.cycleSceneMode ()
-		cinematX.changeSceneMode ((cinematX.currentSceneState + 1) % 3)
+		cinematX.changeSceneMode ((cinematX.currentSceneState + 1) % 4)
 	end
 		
 	function cinematX.changeSceneMode (sceneModeType)	
@@ -2343,6 +2441,10 @@ do
 		if  	(cinematX.showConsole == true)									then
 			hud (false)
 			cinematX.changeHudOverlay (cinematX.IMGNAME_FULLOVERLAY)		
+		
+		-- Race mode
+		elseif  (cinematX.currentSceneState  ==  cinematX.SCENESTATE_RACE)      then
+			cinematX.changeHudOverlay (cinematX.IMGNAME_RACEBG)
 		
 		-- Boss battle mode
 		elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_BATTLE)	then
@@ -2426,8 +2528,8 @@ do
 		return (1-percentVal) * minVal + percentVal*maxVal;
 	end
 	
-	function invLerp (minVal, maxVal, amountVal)
-		return  math.min(1, math.max(0, amountVal-minVal / math.abs(maxVal - minVal)))
+	function invLerp (minVal, maxVal, amountVal)			
+		return  math.min(1.00000, math.max(0.0000, math.abs(amountVal-minVal) / math.abs(maxVal - minVal)))
 	end
 	
 	function cinematX.coordToSpawnX (xPos)

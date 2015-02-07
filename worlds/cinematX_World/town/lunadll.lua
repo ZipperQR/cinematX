@@ -91,7 +91,7 @@ do
 		
 		
 		-- Calleoca speaks
-		cinematX.startDialog  (calleocaActor, "Calleoca", "Hey, sis! I'mma follow you around a bit,  hope you don't mind!", 30, 30, "")
+		cinematX.startDialog  (calleocaActor, "Calleoca", "Hey there! I'mma follow you around a bit,  hope you don't mind!", 30, 30, "")
 		cinematX.waitForDialog ()
 		
 		-- Calleoca starts following the player

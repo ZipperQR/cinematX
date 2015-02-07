@@ -1,4 +1,2 @@
-__LunaVarBankSpecialCounter
-1
 __Lunadll_Version
 8

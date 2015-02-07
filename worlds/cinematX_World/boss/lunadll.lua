@@ -1,5 +1,6 @@
 package.path = package.path .. ";./worlds/cinematX_World/?.lua" .. ";./?.lua"
 cinematX = loadSharedAPI("cinematX")
+cinematX.config (true, false)
 NPCID = loadSharedAPI("npcid")
 
 -- Un-comment this line if lunaworld.lua is being used
@@ -99,11 +100,13 @@ end
 do
 
 	function bossOnLoop ()
-		runAnimation (0, 300,300, 0)
-		runAnimation (0, 300,300, 1)
-		runAnimation (0, 300,300, 1065353216)
+		--runAnimation (0, 300,300, 0)
+		--runAnimation (0, 300,300, 1)
+		--runAnimation (0, 300,300, 1065353216)
 		
 		-- Get references
+		shockwaveNPCL = findnpcs(NPCID.SPARK, -1)[0]
+		shockwaveNPCR = findnpcs(NPCID.SPARK, -1)[1]
 		shockwaveGenLActor = cinematX.getActorFromKey ("shockleft")
 		shockwaveGenRActor = cinematX.getActorFromKey ("shockright")
 		broadswordActor = cinematX.getActorFromKey ("broadsword")
@@ -117,12 +120,40 @@ do
 			
 			
 			-- Shockwave generators
-			if (shockwaveGenLActor ~= nil) then
-				shockwaveGenLActor:setX (broadswordActor:getX()-64) 
-				shockwaveGenLActor:setY (broadswordActor:getY()+32) 
+			if (shockwaveNPCL ~= nil) then
+				shockwaveNPCL.x = broadswordActor:getX()-64 
+				shockwaveNPCL.direction = DIR_LEFT 
+				shockwaveNPCL.y = broadswordActor:getY()+31
 				
 				if  (shockwavesOff == true)  then
-					shockwaveGenLActor.smbxObjRef:mem (0x6C, FIELD_FLOAT, 0)
+					shockwaveNPCL:mem (0x6C, FIELD_FLOAT, 1)
+					shockwaveNPCL.y = Section(player.section).boundary.top - 128 
+				elseif  (shockwaveNPCL:mem (0x6C, FIELD_FLOAT) < 100)  then
+					shockwaveNPCL:mem (0x6C, FIELD_FLOAT, 100)
+				end
+			end
+			
+			if (shockwaveNPCR ~= nil) then
+				shockwaveNPCR.x = broadswordActor:getX()+64 
+				shockwaveNPCR.direction = DIR_RIGHT
+				shockwaveNPCR.y = broadswordActor:getY()+31
+				
+				if  (shockwavesOff == true)  then
+					shockwaveNPCR:mem (0x6C, FIELD_FLOAT, 1)
+					shockwaveNPCR.y = Section(player.section).boundary.top - 128 
+				elseif  (shockwaveNPCR:mem (0x6C, FIELD_FLOAT) < 100)  then
+					shockwaveNPCR:mem (0x6C, FIELD_FLOAT, 100)
+				end
+			end
+			
+			--[[
+			if (shockwaveGenLActor ~= nil) then
+				shockwaveGenLActor:setX (broadswordActor:getX()-64) 
+				shockwaveGenLActor:setY (broadswordActor:getY()+31) 
+				
+				if  (shockwavesOff == true)  then
+					shockwaveGenLActor.smbxObjRef:mem (0x6C, FIELD_FLOAT, 1)
+					shockwaveGenLActor:setY (Section(player.section).boundary.top - 128) 
 				elseif  (shockwaveGenLActor.smbxObjRef:mem (0x6C, FIELD_FLOAT) < 100)  then
 					shockwaveGenLActor.smbxObjRef:mem (0x6C, FIELD_FLOAT, 100)
 				end
@@ -130,15 +161,16 @@ do
 
 			if (shockwaveGenRActor ~= nil) then
 				shockwaveGenRActor:setX (broadswordActor:getX()+64) 
-				shockwaveGenRActor:setY (broadswordActor:getY()+32) 
-				
+				shockwaveGenRActor:setY (broadswordActor:getY()+31) 
+
 				if  (shockwavesOff == true)  then
 					shockwaveGenRActor.smbxObjRef:mem (0x6C, FIELD_FLOAT, 0)
+					shockwaveGenRActor:setY (Section(player.section).boundary.top - 128) 
 				elseif  (shockwaveGenRActor.smbxObjRef:mem (0x6C, FIELD_FLOAT) < 100)  then
 					shockwaveGenRActor.smbxObjRef:mem (0x6C, FIELD_FLOAT, 100)
 				end
 			end	
-			
+			--]]
 
 			-- Snap the collision dummy A to Broadsword
 			if (collisionActor ~= nil) then
@@ -149,7 +181,7 @@ do
 				if (collisionActor.smbxObjRef.id == NPCID_COLLISIONB) then
 					
 					cinematX.bossHP = cinematX.bossHP - 1
-					playSFX ("voice_hurt1.wav")
+					playSFXSDL ("voice_hurt1.wav")
 
 					if battlePhase == 3  then
 						battleFrame = battleFrame + 30
@@ -266,18 +298,15 @@ do
 		cinematX.waitSeconds (1)
 		
 		--playMusic (17)
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "A-ha! 'Twas a good show, "..cinematX.playerNameASXT()..", but I       emerge the victor!", 30, 30, "voice_talk1.wav")  
-		cinematX.waitForDialog ()
-
-		cinematX.startDialog  (nil, cinematX.playerNameASXT(), "B-but we really need that leek!            Best two out of three?", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "A-ha! 'Twas a good show, Demo, but I      emerge the victor!", 30, 30, "voice_talk1.wav")  
 		cinematX.waitForDialog ()
 		  
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Tsk, tsk, tsk! Nobody likes a sore loser,  my dear!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Wait, you're not Demo... am I in the wrong game?", 30, 30, "")
 		cinematX.waitForDialog ()
 
 		-- Broadsword begins walking away, stops and turns back around
 		cinematX.configDialog (false, false, 1)	
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "But I am still feeling a tad sporting...", 160, 100, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Even so... you came here for a fight...", 160, 100, "")
 
 		broadswordActor:walk (2)
 		cinematX.waitSeconds (1)
@@ -289,13 +318,13 @@ do
 		broadswordActor:setDirection (DIR_LEFT)
 		
 		cinematX.configDialog (true, true, 1)	
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Very well! If this preposterous produce    means that much to you, then come and have  a go!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Very well! You may not be my niece, but I shan't back down from a challenge!", 30, 30, "")
 		cinematX.waitForDialog ()
 		  
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Best moi in a duel and the colossal        cabbage is yours!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Best moi in a duel and you'll get your    star!", 30, 30, "")
 		cinematX.waitForDialog ()
 
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "But I shant take this challenge lightly,   so don't hold back yourself!", 30, 30, "voice_talk4.wav")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "But I shant take this battle lightly, so  don't hold back yourself!", 30, 30, "voice_talk4.wav")
 		cinematX.waitForDialog ()
 		  
 		  
@@ -304,12 +333,12 @@ do
 		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "EN GARDE!", 160, 160, "voice_talk5.wav")	
 		cinematX.waitSeconds (0.6)
 		  
-		playSFX (SOUNDID_DRAWSWORD)
+		playSFXSDL (SOUNDID_DRAWSWORD)
 		broadswordActor:setX (broadswordActor:getX() - 8)
 		broadswordActor:setAnimState (cinematX.ANIMSTATE_ATTACK1)
 		cinematX.waitSeconds (1)
 		  
-		playSFX (SOUNDID_SLICE)
+		playSFXSDL (SOUNDID_SLICE)
 		broadswordActor:setX (broadswordActor:getX() - 16)
 		broadswordActor:setAnimState (cinematX.ANIMSTATE_ATTACK2)
 		cinematX.waitSeconds (1)
@@ -324,11 +353,12 @@ do
 		cinematX.playerInputActive = true  
 
 		cinematX.endCutscene ()
+		cinematX.beginBattle ("Augustus Leopold Broadsword Esq. III", 8, cinematX.BOSSHPDISPLAY_HITS, battleCoroutine)
 		cinematX.changeSceneMode (cinematX.SCENESTATE_BATTLE)
 		--collisionANPC:mem (0x46, FIELD_WORD, 0)
 
 		--battleCoroutine ()
-		cinematX.runCoroutine (battleCoroutine)
+		cinematX.runCoroutine ()
 	end
 
 	
@@ -417,10 +447,10 @@ do
 					
 					bossAttackPattern = bossAttackPattern + 1
 					if (bossAttackPattern % 2 == 1) then
-						playSFX ("voice_attack1.wav")
+						playSFXSDL ("voice_attack1.wav")
 						battlePhase = 1
 					else
-						playSFX ("voice_attack2.wav")
+						playSFXSDL ("voice_attack2.wav")
 						battlePhase = 2
 					end
 					battleFrame = 0
@@ -448,7 +478,7 @@ do
 						broadswordActor:jump (10)
 						broadswordActor:walk (dirToCenterX * 6)						
 						broadswordActor:setAnimState (cinematX.ANIMSTATE_ATTACK7)
-						playSFX ("sword2.wav")
+						playSFXSDL ("sword2.wav")
 					end
 				end
 			
@@ -466,7 +496,7 @@ do
 					broadswordActor:lookAtPlayer ()
 				
 				elseif battleFrame == 60 then
-					playSFX (SOUNDID_SLICE)
+					playSFXSDL (SOUNDID_SLICE)
 				
 				elseif battleFrame < 100 then
 					broadswordActor:setAnimState (cinematX.ANIMSTATE_ATTACK2)
@@ -499,7 +529,7 @@ do
 					if broadswordActor:getSpeedY () == 0  then
 						broadswordActor:jump (11)
 						if (battleFrame > 0) then
-							playSFX ("boing.wav")
+							playSFXSDL ("boing.wav")
 						end
 						battleFrame = battleFrame + 1
 					end
@@ -528,6 +558,7 @@ do
 						broadswordActor:setSpeedY (64)
 					else
 						shockwavesOff = false
+						earthquake (3)
 						battleFrame = 120
 						broadswordActor:stopFollowing ()
 					end
@@ -547,6 +578,9 @@ do
 			
 				if     battleFrame < 240 then
 					broadswordActor:setAnimState (cinematX.ANIMSTATE_DEFEAT)
+					collisionActor.smbxObjRef:mem (0x46, FIELD_WORD, 0xFFFF)
+					collisionActor.smbxObjRef:mem (0x46, FIELD_WORD, 0)
+
 				else
 					broadswordActor:jump (4)
 					broadswordActor:walk (dirToCenterX * -4)
@@ -561,7 +595,7 @@ do
 
 				if     battleFrame   ==   1 then
 					broadswordActor:setAnimState (cinematX.ANIMSTATE_DEFEAT)
-					playSFX ("voice_defeat.wav")
+					playSFXSDL ("voice_defeat.wav")
 					playMusic (20)
 
 				elseif battleFrame   == 120 then
@@ -583,10 +617,10 @@ do
  		cinematX.waitSeconds (1)
 		cinematX.configDialog (true, true, 1)	
 		
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "I daresay, that was a most exhilarating    scuffle! Bravo!", 30, 30, "voice_talk1.wav")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "I daresay, that was a most exhilarating   scuffle! Bravo!", 30, 30, "voice_talk1.wav")
 		cinematX.waitForDialog ()
 		
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "As per our wager, the titanic tomato is    now yours. Treasure it always!", 30, 30, "")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "As per our wager, the star is now yours.  Treasure it always!", 30, 30, "")
 		cinematX.waitForDialog ()
 		
 		broadswordActor:jump (6)
@@ -596,30 +630,11 @@ do
 		cinematX.waitSeconds (1.5)
 
 		broadswordActor:setDirection (DIR_RIGHT)
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "And with that, I must take my leave. There is still much adventuring to do! Cheerio!", 30, 30, "voice_talk3.wav")
+		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "And with that, I must take my leave.      There is still much adventuring to do! Cheerio!", 30, 30, "voice_talk3.wav")
 		cinematX.waitForDialog ()
 		
-		broadswordActor:walkForward (2)
+		broadswordActor:walkForward (4)
 		cinematX.waitSeconds (1)
-		
-		broadswordActor:walk (0)
-		broadswordActor:setDirection (DIR_LEFT)
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Ah, one more thing.", 30, 30, "voice_talk4.wav")
-		cinematX.waitForDialog ()
-		
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "My brothers are...", 30, 30, "")
-		cinematX.waitForDialog ()
-				
-		cinematX.waitSeconds (1)
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "...", 30, 30, "")
-		cinematX.waitForDialog ()
-		
-		broadswordActor:setDirection (DIR_RIGHT)		
-		cinematX.startDialog  (broadswordActor, "Uncle Broadsword", "Ah, what am I doing? Spoilers, Augustus!   Spoilers!", 30, 30, "")
-		cinematX.waitForDialog ()
-
-		broadswordActor:walk (2)
-		cinematX.waitSeconds (2)
 		
 		cinematX.endCutscene ()
 	end

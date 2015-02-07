@@ -1,5 +1,6 @@
 local lunaworldLib = {}
 cinematX = loadSharedAPI("cinematX")
+cinematX.config (true, false)
 
 --***************************************************************************************
 -- 																						*
@@ -27,11 +28,6 @@ end
 -- 																						*
 --***************************************************************************************
 do
-
-	function cutscene_Calleoca ()
-		cinematX.toConsoleLog ("Lunaworld scene called")
-	end
-
 end
 
 return lunaworldLib
