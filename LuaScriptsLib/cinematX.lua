@@ -1163,7 +1163,7 @@ do
 				local shouldBeActor = true
 				
 				if  (cinematX.actorCriteria ~= nil)  then
-					shouldBeActor = actorCriteria (v)
+					shouldBeActor = cinematX.actorCriteria (v)
 				end
 				
 				if  (shouldBeActor == true)  then
