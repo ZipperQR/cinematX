@@ -24,6 +24,9 @@ do
 	-- Resource path
 	cinematX.resourcePath = "..\\..\\..\\LuaScriptsLib\\cinematX\\"
 
+	-- Checkpoint reached
+	cinematX.midpointReached = false
+	
 	-- Animation states enum
 	cinematX.ANIMSTATE_NUMFRAMES =  0
 	cinematX.ANIMSTATE_IDLE      =  1
@@ -77,8 +80,13 @@ do
 			thisActorObj.npcid = smbxObjRef.id
 		end
 		
+		thisActorObj.name = "UNNAMED"
+		thisActorObj.uid = -1
+		thisActorObj.wasMismatched = false
+		thisActorObj.isDirty = true
+		
 		thisActorObj.animState = cinematX.ANIMSTATE_IDLE
-
+		
 		thisActorObj.shouldFacePlayer = false
 		thisActorObj.closeIdleAnim = cinematX.ANIMSTATE_TALK
 		thisActorObj.farIdleAnim = cinematX.ANIMSTATE_IDLE
@@ -125,22 +133,73 @@ do
 		thisActorObj.wordBubbleIcon = nil
 		thisActorObj.messageIsNew = true
 
+		thisActorObj.invincible = false
+		thisActorObj.onGround = true
+		
 		--thisActorObj.x = 0
 		--thisActorObj.y = 0
 		--thisActorObj.speedX = 0
 		--thisActorObj.speedY = 0
 		--thisActorObj.direction = 0
 
+		
 		--windowDebug ("Actor created: "..thisActorObj.smbxClass)
 
 		return thisActorObj
 	end
 
 	
+	
+	-- Memory functions
+	do
+		function Actor:getMem(offset,field)
+			if  (self.smbxObjRef == nil)  then  
+				return nil;			
+			end
+			
+			return self.smbxObjRef:mem (offset, field)
+		end
+		
+		function Actor:setMem(offset,field,value)
+			if  (self.smbxObjRef == nil)  then  
+				return;			
+			end
+			
+			self.smbxObjRef:mem (offset, field, value)
+		end
+		
+		function Actor:UIDCheck ()
+			if  self.smbxClass == "Player"  then
+				return true
+			end
+		
+			if   (self:getUIDMem ()  ~=  self.uid)  then
+				if  (self.wasMismatched == false)  then
+					self.wasMismatched = true
+					cinematX.toConsoleLog ("UID MISMATCH: MEM " .. tostring(self:getUIDMem()) .. ", VAR " .. tostring(self.uid) .. "; NPCID MEM " .. self.smbxObjRef.id .. ", VAR " .. self.npcid)
+				end
+				return false;
+			else
+				return true;
+				end
+		end
+		
+		function Actor:getUIDMem ()
+			if  self.smbxClass == "Player"  then
+				return 0
+			end
+		
+			return self:getMem (cinematX.ID_MEM, FIELD_WORD)
+		end
+	end
 
 	-- Getters and setters for movement vars
 	do
 	    function Actor:getDirection()
+			if  (self.smbxObjRef == nil)  then  
+				return nil;			
+			end
+			
 			if  self.smbxClass == "Player"  then
 				return self.smbxObjRef:mem (0x106, FIELD_WORD)
 			
@@ -150,6 +209,10 @@ do
 	    end
 	   
 	    function Actor:setDirection(newDir)
+			if  (self.smbxObjRef == nil)  then  
+				return;			
+			end
+			
 			if self.smbxClass == "Player" then
 				self.smbxObjRef:mem (0x106, FIELD_WORD, newDir)
 			else
@@ -158,35 +221,67 @@ do
 	    end
 	   
 	    function Actor:getX()
+			if  (self.smbxObjRef == nil)  then  
+				return nil;			
+			end
+		
 			local val = self.smbxObjRef.x
 			return val
 	    end
 	   
 	    function Actor:setX(newX)
+			if  (self.smbxObjRef == nil)  then  
+				return;			
+			end
+		
 			self.smbxObjRef.x = newX
 	    end
 	   
 	    function Actor:getY()
+			if  (self.smbxObjRef == nil)  then  
+				return nil;			
+			end
+		
 			return self.smbxObjRef.y	   
 	    end	   
 	   
 	    function Actor:setY(newY)
+			if  (self.smbxObjRef == nil)  then  
+				return;			
+			end
+
 			self.smbxObjRef.y = newY	   
 	    end	   
 	   
 	    function Actor:getSpeedX()
+			if  (self.smbxObjRef == nil)  then  
+				return nil;			
+			end
+		
 			return self.smbxObjRef.speedX	   
 	    end
 	   
 	    function Actor:setSpeedX(newSpd)
+			if  (self.smbxObjRef == nil)  then  
+				return;			
+			end
+
 			self.smbxObjRef.speedX = newSpd
 	    end
 	   
 	    function Actor:getSpeedY()
+			if  (self.smbxObjRef == nil)  then  
+				return nil;			
+			end
+
 			return self.smbxObjRef.speedY	   
 	    end
 	   
 	    function Actor:setSpeedY(newSpd)
+			if  (self.smbxObjRef == nil)  then  
+				return;			
+			end
+		
 			self.smbxObjRef.speedY = newSpd
 	    end
 
@@ -196,10 +291,18 @@ do
 	do
 	
 		function Actor:getAnimFrame ()
+			if  (self.smbxObjRef == nil)  then  
+				return nil;			
+			end
+		
 			return self.smbxObjRef:mem (0xE4, FIELD_WORD) --:getAnimFrame ()
 		end
 		
 		function Actor:setAnimFrame (newFrame)
+			if  (self.smbxObjRef == nil)  then  
+				return nil;			
+			end
+
 			self.smbxObjRef:mem (0xE4, FIELD_WORD, newFrame)  --.setAnimFrame (newFrame)
 		end
 	
@@ -217,7 +320,7 @@ do
 			
 			local boundsString = animDataTable [myState]
 			if (boundsString == nil) then
-				windowDebug ("BOUNDS STRING GATE")
+				--windowDebug ("BOUNDS STRING GATE")
 				return;
 			end
 			
@@ -257,7 +360,7 @@ do
 			if self:getAnimState() < cinematX.ANIMSTATE_ATTACK1 then
 
 				-- If on ground
-				if    self:getSpeedY() == 0 then
+				if    (self.onGround == true)   then
 					if    math.abs (self:getSpeedX()) < 1 then
 						if    cinematX.dialogSpeaker == self   then
 							self:setAnimState (self.talkAnim)
@@ -487,16 +590,41 @@ do
 		
 	-- Update
 	function Actor:update ()
+		
+		-- Skip update if the corresponding NPC/Player is destroyed
+		local skipUpdate = false
+		
+		if     (self.smbxObjRef == nil  or  self.smbxObjRef == 0  or  self.smbxObjRef == -1)  then  
+			skipUpdate = true
+		elseif (self.smbxObjRef:mem (0x122, FIELD_WORD) > 0   or   self:UIDCheck () == false  or self.smbxObjRef.id == 0)  then
+			skipUpdate = true
+		end	
 	
-		-- Destroy self if the corresponding NPC/Player is destroyed
-		if  (self.smbxObjRef == nil)  or  
-			(self.smbxObjRef:mem(0x122, FIELD_WORD) ~= 0)  then
-				self.isDead = true
-				--windowDebug ("ERROR: NPC DESTROYED")
-				return;
+		if  (skipUpdate == true)  then
+			self.isDead = true
+			return;
 		end
 	
-		-- Jump signal
+		
+		-- Display the actor's UID variables
+		if  (cinematX.showDebugInfo == true)  then
+			printText (tostring(self:getUIDMem()) .. ", " .. self.uid, 4, self:getScreenX(), self:getScreenY()-32)
+		end
+		
+		-- Update invincible
+		if  (self.invincible == true)  then
+			self:setMem (0x156, FIELD_WORD, 1)
+		end
+
+		-- Update on ground
+		self.onGround = false
+			
+		if  (self:getMem (0x00A, FIELD_WORD) == 2  or  self:getMem (0x120, FIELD_WORD) == 0xFFFF)  then
+			self.onGround = true
+		end
+		
+		
+		-- Update jump signal
 		self.framesSinceJump = self.framesSinceJump + 1
 		
 		-- Check if underwater
@@ -702,6 +830,8 @@ do
 	
 	cinematX.initCalledYet = false
 	
+	
+	
 	function cinematX.initLevel ()
 		-- Prevent this function from being called twice
 		if  (cinematX.initCalledYet == true)  then  return  end
@@ -725,21 +855,35 @@ do
 	end
 	
 	function cinematX.delayedInitLevel ()
+		--windowDebug ("TEST LEVEL")
+		cinematX.updateMidpointCheck ()
+		
 		cinematX.indexActors (false)
 		cinematX.delayedInitCounter = cinematX.delayedInitCounter + 1
 		
 		-- Play a cutscene if specified in an onLoad event
-		if  (cinematX.levelStartScene ~= nil)  then
+		if  (cinematX.levelStartScene ~= nil  and  cinematX.midpointReached == false)  then
 			cinematX.runCutscene (cinematX.levelStartScene)
 		end
 	end
 	
+	
 	function cinematX.delayedInitSection ()
+		--windowDebug ("TEST SECTION")
+		cinematX.updateMidpointCheck ()
 	
 		-- Play a cutscene if specified in an onLoad event
 		if  (cinematX.sectionStartScene[cinematX.delayedInitSectionNum] ~= nil)  then
 			cinematX.runCutscene (cinematX.sectionStartScene [cinematX.delayedInitSectionNum])
 		end
+		
+		--[[
+		-- Play level start scene
+		if  (cinematX.levelStartScene ~= nil  and  cinematX.levelStartScenePlayed == false  and  cinematX.midpointReached == false)  then
+			cinematX.levelStartScenePlayed = true
+			cinematX.runCutscene (cinematX.levelStartScene)
+		end
+		--]]
 	end
 	
 	cinematX.currentFrameTime = 0
@@ -754,6 +898,7 @@ do
 	cinematX.playerActor = Actor.create(player, "Player")
 	
 	cinematX.actorCount = 0
+	cinematX.npcCount = 0
 	
 	cinematX.indexedActors = {}
 	cinematX.indexedNPCRefs = {}
@@ -854,6 +999,7 @@ do
 
 	-- Cutscene to play at the beginning of the level
 	cinematX.levelStartScene = nil
+	cinematX.levelStartScenePlayed = false
 	
 	-- Cutscenes to play at the beginning of each section
 	cinematX.sectionStartScene = {}
@@ -1010,9 +1156,11 @@ do
 		--cinematX.defineQuest ("test", "Test Quest", "Test the quest the quest the test system")
 	end
 	
+
+	cinematX.debugLogTable = {}
+	cinematX.debugCurrentLine = 00
+			
 	function cinematX.initDebug ()
-		cinematX.debugLogTable = {}
-		cinematX.debugCurrentLine = 00
 		cinematX.showConsole = false
 		
 		cinematX.toConsoleLog ("Console test")
@@ -1036,6 +1184,23 @@ do
 			cinematX.initLevel ()
 		end
 	
+		-- Keep track of how long the player holds the jump button
+		--if (cinematX.playerHoldingJump == true) then
+		--	cinematX.playerActor.jumpStrength = cinematX.playerActor.jumpStrength + 1
+		--end
+	
+		cinematX.updateMidpointCheck ()
+		cinematX.updateTiming ()
+		cinematX.updateScene ()
+		cinematX.updateActors ()
+		cinematX.updateNPCMessages ()
+		cinematX.updateDialog ()
+		cinematX.updateRace ()
+		cinematX.updateUI ()
+		cinematX.updateCheats ()
+		--cinematX.updateInput ()
+		
+		
 		-- Call delayed init (level)
 		if 	cinematX.delayedInitCalledFromUpdate == false  then
 			cinematX.delayedInitLevel ()
@@ -1048,24 +1213,22 @@ do
 			cinematX.delayedInitSection ()
 			cinematX.delayedInitSectionNum = player.section
 		end
-	
-		-- Keep track of how long the player holds the jump button
-		--if (cinematX.playerHoldingJump == true) then
-		--	cinematX.playerActor.jumpStrength = cinematX.playerActor.jumpStrength + 1
-		--end
-	
-	
-		cinematX.updateTiming ()
-		cinematX.updateScene ()
-		cinematX.updateActors ()
-		cinematX.updateNPCMessages ()
-		cinematX.updateDialog ()
-		cinematX.updateRace ()
-		cinematX.updateUI ()
-		cinematX.updateCheats ()
-		--cinematX.updateInput ()
 	end
 
+	function cinematX.updateMidpointCheck ()	
+		local midpoint = findnpcs(192, -1) [0]
+		
+		if midpoint == nil then
+			return
+		end
+		
+		if (midpoint:mem (0x44, FIELD_WORD) ~= 0)  or  (midpoint:mem(0x122, FIELD_WORD) ~= 0)   then
+			cinematX.midpointReached = true
+			cinematX.toConsoleLog ("MIDPOINT")
+		end
+	end
+	
+	
 	function cinematX.updateTiming ()
 		local lastFrameTime = cinematX.currentFrameTime
 		cinematX.currentFrameTime = os.clock ()
@@ -1124,7 +1287,6 @@ do
 		return pTagStr
 	end
 	
-	cinematX.npcCache = {}
 	
 	-- Swap this for the location to store and read the NPC unique ID. 0x08 appears unused, but this can be changed to any unused word.
 	cinematX.ID_MEM =  0x08
@@ -1136,52 +1298,73 @@ do
 		end
 		
 		-- Loop through every NPC, create an indexed actor instance for each one and store the messages & other info
-		local i = 0
+		--local i = 0
 		
 		for k,v in pairs (npcs()) do
-	   
-			local uid = v:mem(cinematX.ID_MEM, FIELD_WORD);
-			 
-			--Validity check message string to ensure we don't follow null pointers.
-			local msgStr = ""
-			if(v:mem (0x4C, FIELD_DWORD) > 0) then msgStr = v.msg.str end
-			 
-			--Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
-			if(uid == 0) then
-				v:mem(cinematX.ID_MEM, FIELD_WORD, cinematX.actorCount);
-				uid = cinematX.actorCount;
-				cinematX.actorCount = cinematX.actorCount + 1;
+    
+			local uid = v:mem (cinematX.ID_MEM, FIELD_WORD);
+			local isDying = false
+			if  (v:mem (0x122, FIELD_WORD)  >  0)  then
+				isDying = true
 			end
-			 
+			
+			
+			--Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
+			if (uid == 0  and  isDying == false)  then
+				uid = cinematX.npcCount;
+				v:mem (cinematX.ID_MEM, FIELD_WORD, uid);
+				--windowDebug ("CHECK NPC ID: " .. v.id);
+				cinematX.npcCount = cinematX.npcCount + 1;
+			elseif 	isDying == true  then
+				--windowDebug("Killed: "..v.msg.str);
+			end
+			
 			--Have we already defined this actor? If so, then we update the SMBX reference accordingly.
-			if(cinematX.npcCache[uid] ~= nil) then
-				cinematX.npcCache[uid].smbxObjRef = v;
+			if (cinematX.indexedActors[uid] ~= nil) then
+				cinematX.indexedActors[uid].smbxObjRef = v;
+				cinematX.indexedActors[uid].uid = uid;
+				cinematX.indexedActors[uid].isDirty = true
+				
+			
 			--Otherwise, create a new actor, if necessary.
-			elseif(msgStr ~= nil  and   msgStr ~= "" ) then
-				
-				-- Run qualifier function if it exists
-				local shouldBeActor = true
-				
-				if  (cinematX.actorCriteria ~= nil)  then
-					shouldBeActor = cinematX.actorCriteria (v)
+			else
+
+				--Validity check message string to ensure we don't follow null pointers.
+				local msgStr = nil
+				if(v:mem (0x4C, FIELD_DWORD) > 0) then 
+					msgStr = v.msg.str
 				end
-				
-				if  (shouldBeActor == true)  then
-				
-					-- Create the actor and add it to the table
-					local thisActor = Actor.create (v, "NPC")
-					thisActor.messageNew = true   
-					thisActor.messagePointer = v:mem (0x4C, FIELD_DWORD)
-					cinematX.indexedActors[i] = thisActor
-				   
-				   
-					-- Get the message string
-					thisActor.messageString = msgStr      
-				   
-				   
-					-- Parse the message string
-					if  (msgStr ~= ""   and   msgStr ~= nil)   then
+
+				if  (msgStr ~= nil  and   msgStr ~= "") then
+
+					if (v:mem(0x122, FIELD_WORD) ~= 0)   then
+						cinematX.toConsoleLog ("STILLBORN ACTOR")
+					end
+
+					
+					-- Run qualifier function if it exists
+					local shouldBeActor = true
+					
+					if  (cinematX.actorCriteria ~= nil)  then
+						shouldBeActor = cinematX.actorCriteria (v)
+					end
+					
+					if  (shouldBeActor == true)  then
+					
+						-- Create the actor and add it to the table
+						local thisActor = Actor.create (v, "NPC")
+						thisActor.uid = uid
+						thisActor.messageNew = true   
+						thisActor.messagePointer = v:mem (0x4C, FIELD_DWORD)
+						cinematX.indexedActors[uid] = thisActor
 					   
+					   
+						-- Get the message string
+						thisActor.messageString = msgStr      
+					   
+					   
+						-- Parse the message string						
+					
 						-- Get the substring between the first and last characters
 						local checkStringA = string.sub  (msgStr, 2, string.len(msgStr)-1)
 						-- Get JUST the first and last characters
@@ -1243,17 +1426,31 @@ do
 						if   (cinematX.overrideNPCMessages == true  and  shouldClearMessage == true)   then
 							local message = msgStr
 							v.msg:clear()
-							cinematX.npcCache[uid] = thisActor 
+							cinematX.indexedActors[uid] = thisActor
 						end
-					end
-					
-					-- Increment the actor count
-					i = i + 1;
+						
+						-- Increment the actor count
+						cinematX.actorCount = cinematX.actorCount + 1;
+						--i = i + 1;
+					end					
 				end
-				
 			end
         end
+		
+		
+		-- Check dirty
+		for k,v in pairs (cinematX.indexedActors) do
+			if  (v.isDirty == true)  then
+				cinematX.indexedActors[k].isDirty = false
+				--windowDebug ("Actor cleaned")
+			else
+				cinematX.toConsoleLog ("Actor destroyed: "..(v.name)..", "..(v.npcid))
+				cinematX.indexedActors[k].smbxObjRef = nil
+				cinematX.indexedActors[k] = nil
+			end
+		end
     end
+	
 	
 	function cinematX.updateActors ()
 		
@@ -1262,22 +1459,24 @@ do
 			return
 		end
 		
+		
+		-- Index new actors
+		cinematX.indexActors (true)
+		
+		
 		-- Loop through every actor and call their update methods
 		cinematX.playerActor:update ()
 		
 		for k,v in pairs (cinematX.indexedActors) do
 			if  (v ~= nil)  then
 				if (v.smbxObjRef == nil) then
-					windowDebug ("ERROR: NPC DESTROYED")
+					cinematX.toConsoleLog ("ERROR: NPC DESTROYED")
 					v = nil
 				else
 					v:update ()
 				end
 			end
 		end
-
-		-- Index new actors
-		cinematX.indexActors (true)
 		
 		
 		-- Freeze the player
@@ -2625,7 +2824,7 @@ do
 	function cinematX.changeSceneMode (sceneModeType)	
 		cinematX.currentSceneState = sceneModeType
 		cinematX.refreshHUDOverlay ()
-		--windowDebug ("SWITCH TO STATE "..cinematX.currentSceneState)
+		cinematX.toConsoleLog ("SWITCH TO STATE "..cinematX.currentSceneState)
 
 	end
 	
@@ -2697,7 +2896,7 @@ end
 
 do
 	function cinematX.toConsoleLog (text)
-		cinematX.debugLogTable[cinematX.debugCurrentLine] = text
+		cinematX.debugLogTable [cinematX.debugCurrentLine] = text
 		cinematX.debugCurrentLine = cinematX.debugCurrentLine + 1
 	end
 	
