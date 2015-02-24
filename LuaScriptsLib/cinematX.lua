@@ -613,7 +613,7 @@ do
 		
 		-- Update invincible
 		if  (self.invincible == true)  then
-			self:setMem (0x156, FIELD_WORD, 1)
+			self:setMem (0x156, FIELD_WORD, 2)
 		end
 
 		-- Update on ground
