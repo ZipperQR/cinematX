@@ -1,4 +1,17 @@
+--***************************************************************************************
+--                                                                                      *
+-- 	cinematX.lua																		*
+--  v0.0.8a                                                      						*
+--  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
+--	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
+--                                                                                      *
+--***************************************************************************************
+
 local cinematX = {} --Package table
+local graphX = loadSharedAPI("graphX");
+local eventu = loadSharedAPI("eventu");
+local npcconfig = loadSharedAPI("npcconfig");
+
 
 function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
 	--register event handler
@@ -9,11 +22,10 @@ function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
 	--registerEvent(cinematX, "onLoad", "delayedInit", false) --Register the init event
 	registerEvent(cinematX, "onLoop", "update", true) --Register the loop event
 	registerEvent(cinematX, "onJump", "onJump", true) --Register the jump event
+	registerEvent(cinematX, "onInputUpdate", "onInputUpdate", true) --Register the input event
 	registerEvent(cinematX, "onKeyDown", "onKeyDown", true) --Register the input event
 	registerEvent(cinematX, "onKeyUp", "onKeyUp", false) --Register the input event
 end
-
-
 
 --***************************************************************************************************
 --                                                                                                  *
@@ -52,7 +64,7 @@ do
 	cinematX.ANIMSTATE_ATTACK6 	 = 21
 	cinematX.ANIMSTATE_ATTACK7 	 = 22
 	
-
+	
 	-- Actor animation state table
 	cinematX.npcAnimStates = {}
 end
@@ -115,6 +127,7 @@ do
 		thisActorObj.actorToFollow = nil
 		thisActorObj.shouldTeleportToTarget = false
 		thisActorObj.distanceToFollow = 64
+		thisActorObj.distanceToAccel = 128
 		thisActorObj.destWalkSpeed = 0
 		thisActorObj.walkSpeed = 0
 		thisActorObj.walkDestX = 0
@@ -193,6 +206,7 @@ do
 		end
 	end
 
+	
 	-- Getters and setters for movement vars
 	do
 	    function Actor:getDirection()
@@ -217,6 +231,14 @@ do
 				self.smbxObjRef:mem (0x106, FIELD_WORD, newDir)
 			else
 				self.smbxObjRef.direction = newDir
+			end
+	    end
+	    
+		function Actor:setDirectionFromMovement()
+			if  (self:getSpeedX () > 0)  then  
+				self:setDirection (DIR_RIGHT)			
+			elseif  (self:getSpeedX () < 0)  then
+				self:setDirection (DIR_LEFT)			
 			end
 	    end
 	   
@@ -288,13 +310,14 @@ do
 	end
 	
 	-- Animation
-	do
-	
+	do			
 		function Actor:getAnimFrame ()
 			if  (self.smbxObjRef == nil)  then  
 				return nil;			
 			end
-		
+			
+			--windowDebug (tostring(self.smbxObjRef:mem (0xE4, FIELD_WORD)))
+			
 			return self.smbxObjRef:mem (0xE4, FIELD_WORD) --:getAnimFrame ()
 		end
 		
@@ -334,8 +357,11 @@ do
 			--windowDebug ("ANIM STATE BY MOVEMENT")
 			
 			-- Clamp animation frames accordingly
-			self:clampAnim (minVal, maxVal, animDataTable [cinematX.ANIMSTATE_NUMFRAMES])
+			self:clampAnim (minVal, maxVal, npcconfig[self.npcid].frames)--animDataTable [cinematX.ANIMSTATE_NUMFRAMES])
 		end
+		
+					--gfxoffsetx, gfxoffsety, width, height, gfxwidth, gfxheight, frames, framespeed, framestyle,
+
 
 		function Actor:clampAnim (minVal, maxVal, dirOffsetFrames)
 		  
@@ -484,12 +510,14 @@ do
 	
 	-- Movement
 	do
-		function Actor:followActor (targetActor, speed, howClose, shouldTeleport)
+		function Actor:followActor (targetActor, speed, howClose, shouldTeleport, easeDist)
 			self.shouldWalkToDest = true
 			self.actorToFollow = targetActor
 			self.distanceToFollow = howClose
 			self.destWalkSpeed = speed
 			self.shouldTeleportToTarget = shouldTeleport
+			
+			self.distanceToAccel = easeDist or 128
 		end
 	
 		function Actor:stopFollowing ()
@@ -573,18 +601,41 @@ do
 			self.walkSpeed = speed * self:getDirection ()
 		end
 		
-		function Actor:walkToX (dest, speed)
+		function Actor:walkToX (dest, speed, precision, easeDist)
 			self.shouldWalkToDest = true
 			self.walkDestX = dest
 			self.destWalkSpeed = speed
-			self.distanceToFollow = 8
+			self.distanceToFollow = precision or 8
+			self.distanceToAccel = easeDist or 128
 		end
 		
 		function Actor:jump (strength)
-			self:setSpeedY (-1 * strength)
-			playSFX (1)	
-			self.framesSinceJump = 0
-			self.jumpStrength = strength
+			--if  self.smbxObjRef == player  then
+			
+			--else
+				self:setSpeedY (-1 * strength)
+				cinematX.playSFXSingle (1)	
+				self.framesSinceJump = 0
+				self.jumpStrength = strength
+			--end
+		end
+		
+		function Actor:teleportToPosition (newX, newY)
+			-- Smoke puffs
+			Animation.spawn (10, self:getX(), self:getY(), 0)
+			Animation.spawn (10, self:getX()-8, self:getY()+16, 0)
+			Animation.spawn (10, self:getX()+8, self:getY()+16, 0)
+			Animation.spawn (10, self:getX(), self:getY()+24, 0)
+
+			-- Teleport
+			self:setX (newX)
+			self:setY (newY)
+				
+			-- Smoke puffs
+			Animation.spawn (10, self:getX(), self:getY(), 0)
+			Animation.spawn (10, self:getX()-8, self:getY()+16, 0)
+			Animation.spawn (10, self:getX()+8, self:getY()+16, 0)
+			Animation.spawn (10, self:getX(), self:getY()+24, 0)
 		end
 	end
 		
@@ -609,6 +660,7 @@ do
 		-- Display the actor's UID variables
 		if  (cinematX.showDebugInfo == true)  then
 			printText (tostring(self:getUIDMem()) .. ", " .. self.uid, 4, self:getScreenX(), self:getScreenY()-32)
+			printText (tostring(self:getAnimFrame()), 4, self:getScreenX(), self:getScreenY()-48)
 		end
 		
 		-- Update invincible
@@ -662,15 +714,8 @@ do
 			-- Teleport to the actor's position if too far away
 			if  (self:distanceActor(leadActor) > 350  and  self.shouldTeleportToTarget == true)   then
 				
-				-- Teleport
-				self:setX (leadActor:getX () - self.distanceToFollow * leadActor:getDirection ())
-				self:setY (leadActor:getY () - 32)
-				
-				-- Smoke puffs
-				runAnimation (10, self:getX(), self:getY(), 0)
-				runAnimation (10, self:getX()-8, self:getY()+16, 0)
-				runAnimation (10, self:getX()+8, self:getY()+16, 0)
-				runAnimation (10, self:getX(), self:getY()+24, 0)
+				self:teleportToPosition (leadActor:getX () - self.distanceToFollow * leadActor:getDirection (),
+										 leadActor:getY () - 32)
 			end
 		end
 		
@@ -716,7 +761,7 @@ do
 			if  self:distanceActorX (cinematX.playerActor) < 64  then
 				if (self.saidHello == false  and  self.helloCooldown <= 0) then
 					if  (self.helloVoice ~= "")  then
-						playSFXSDL (self.helloVoice)
+						cinematX.playSFXSDLSingle (self.helloVoice)
 					end
 					self.saidHello = true
 				end
@@ -726,7 +771,7 @@ do
 			elseif  (self:distanceActorX (cinematX.playerActor) < 400)  then
 				if  (self.saidHello == true)  then
 					if  (self.goodbyeVoice ~= "")  then
-						playSFXSDL (self.goodbyeVoice)
+						cinematX.playSFXSDLSingle (self.goodbyeVoice)
 					end
 					self.saidHello = false
 					self.helloCooldown = 300
@@ -752,7 +797,7 @@ do
 			end
 			
 			-- Get acceleration multiplier
-			local accelMult = invLerp (0,128, destDist)
+			local accelMult = invLerp (0,self.distanceToAccel, destDist)
 			
 			-- Walk
 			--self.walkSpeed = 0
@@ -760,8 +805,9 @@ do
 			self.walkSpeed = dirMult * accelMult * math.min(self.destWalkSpeed, destDist * 0.125)
 		end
 		
-		-- Walk
-		if (self.walkSpeed ~= 0) then
+		-- Perform walking
+		if (self.walkSpeed ~= 0  and  (smbxObjRef == player  and  cinematX.currentSceneState ~= SCENESTATE_CUTSCENE) == false) then
+			self:setDirectionFromMovement ()
 			self:setSpeedX (self.walkSpeed)
 		end
 		
@@ -797,21 +843,51 @@ end
 --       Show debug 			-- Pretty self-explanatory, displays a bunch of debug info so you	*
 --									can see if cinematX is behaving properly.						*
 --                                                                                                  *
+--		 Section transition     -- Fade out when leaving a section via door, pipe, etc and fade		*
+--									into the new section											*
+--                                                                                                  *
+--		 Use New UI     		-- If true, UI elements will use the OpenGL renderer if it is		*
+--									available and default to the old UI	otherwise; 					*
+--									if false, the old UI will always be used.						*
 --***************************************************************************************************
 
 do
 	cinematX.overrideNPCMessages = false
-	cinematX.showDebugInfo = true--false
+	cinematX.showDebugInfo = true --false
 	cinematX.shouldGenerateActors = true
 	cinematX.actorCriteria = nil
+	cinematX.transitionBetweenSections = true
+	cinematX.useNewUI = true
+	cinematX.useHUDBox = false
+	
 	--cinematX.npcsToIgnore = {}
 	
-	function cinematX.config (--[[genActors, genCriteria,--]] toggleOverrideMsg, showDebug)
-		--cinematX.shouldGenerateActors = genActors
-		--cinematX.actorGenQualifier = genCriteria
-		--cinematX.npcsToIgnore = ignoreTheseNPCs
+	function cinematX.config (toggleOverrideMsg, showDebug, useHUDBox, useTransitions, oglUI)
+		
+		-- Set default values
+		if  toggleOverrideMsg 		== nil	then
+			toggleOverrideMsg = true
+		end	
+		if  showDebug 				== nil	then
+			showDebug = false
+		end	
+		if  useHUDBox				== nil	then
+			useHUDBox = false
+		end	
+		if  useTransitions 			== nil	then
+			useTransitions = true
+		end	
+		if  oglUI 					== nil	then
+			oglUI = true
+		end	
+
+	
+		-- Assign values
 		cinematX.overrideNPCMessages = toggleOverrideMsg
-		cinematX.showDebugInfo = showDebug		
+		cinematX.showDebugInfo = showDebug
+		cinematX.useHUDBox = useHUDBox
+		cinematX.transitionBetweenSections = useTransitions
+		cinematX.useNewUI = oglUI
 	end
 end
 
@@ -851,6 +927,10 @@ do
 	end
 	
 	function cinematX.initSection ()
+		if   cinematX.transitionBetweenSections == true   then
+			cinematX.fadeScreenIn (0.5)
+		end
+		
 		cinematX.initActors ()
 	end
 	
@@ -896,6 +976,7 @@ do
 	
 	
 	cinematX.playerActor = Actor.create(player, "Player")
+	cinematX.playerHidden = false
 	
 	cinematX.actorCount = 0
 	cinematX.npcCount = 0
@@ -908,7 +989,17 @@ do
 	cinematX.currentMessageNPCObj = nil
 	cinematX.currentMessageNPCIndex = nil
 	cinematX.currentMessageActor = nil
-		
+	
+	cinematX.screenTintColor = 0xFFFFFF00
+	
+	cinematX.screenTransitionAmt = 0
+	cinematX.screenTransitionTime = 0.5
+
+	cinematX.currentImageRef_hud		=	nil	
+	cinematX.currentImageRef_screen		=	nil	
+
+	
+	
 	function cinematX.initDialog ()
 	
 		-- Speaker object
@@ -1062,19 +1153,86 @@ do
 		-- Boss HP
 		cinematX.bossHPMax = 8
 		cinematX.bossHP = 8
+		cinematX.bossHPEase = 8
 	
 		-- Boss health display modes
 		cinematX.BOSSHPDISPLAY_NONE = 0
 		cinematX.BOSSHPDISPLAY_HITS = 1
 		cinematX.BOSSHPDISPLAY_BAR1 = 2
+		cinematX.BOSSHPDISPLAY_BAR2 = 3
 		
 		-- The current display mode
-		cinematX.bossHPDisplayType = cinematX.BOSSHPDISPLAY_HITS		
+		cinematX.bossHPDisplayType = cinematX.BOSSHPDISPLAY_BAR2		
 	end
 
+	
+	function cinematX.getImagePath (filename)		
+		
+		if Misc.resolveFile (filename)  ~=  nil  then
+			return filename
+		end
+		
+		return cinematX.resourcePath..filename
+	end
+	
+	
 	function cinematX.initHUD ()
-
+		
+		-- Detect whether the computer can take advantage of the OpenGL renderer
+		cinematX.canUseNewUI = true
+	
+		-- Color code constants
+		cinematX.COLOR_TRANSPARENT = 0xFFFFFF--0xFB009D
+		
+		
+		-- Filename constants
+		cinematX.IMGNAME_BLANK	 				=	cinematX.getImagePath ("blankImage.png")
+		cinematX.IMGNAME_LETTERBOX 				=	cinematX.getImagePath ("letterbox.png")
+		cinematX.IMGNAME_FULLOVERLAY			=	cinematX.getImagePath ("fullScreenOverlay.png")
+		cinematX.IMGNAME_PLAYDIALOGBOX			=	cinematX.getImagePath ("playSubtitleBox.png")
+		cinematX.IMGNAME_BOSSHP_RIGHT 			= 	cinematX.getImagePath ("bossHP_right.png")
+		cinematX.IMGNAME_BOSSHP_LEFT 			=	cinematX.getImagePath ("bossHP_left.png")
+		cinematX.IMGNAME_BOSSHP_EMPTY 			= 	cinematX.getImagePath ("bossHP_midE.png")
+		cinematX.IMGNAME_BOSSHP_FULL 			=	cinematX.getImagePath ("bossHP_midF.png")
+		cinematX.IMGNAME_BOSSHP_BG 				=	cinematX.getImagePath ("bossHP_bg.png")
+		
+		cinematX.IMGNAME_RACEBG 				=	cinematX.getImagePath ("raceBg.png")
+		cinematX.IMGNAME_RACEPLAYER				=	cinematX.getImagePath ("racePlayer.png")
+		cinematX.IMGNAME_RACEOPPONENT			=	cinematX.getImagePath ("raceOpponent.png")
+		
+		cinematX.IMGNAME_HUDBOX					=	cinematX.getImagePath ("hudBox.png")
+		
+		cinematX.IMGNAME_NPCICON_TALK_O	 		=	cinematX.getImagePath ("npcIcon_TalkOld.png")
+		cinematX.IMGNAME_NPCICON_TALK_N 		=	cinematX.getImagePath ("npcIcon_TalkNew.png")
+		cinematX.IMGNAME_NPCICON_QUEST_O 		=	cinematX.getImagePath ("npcIcon_QuestOld.png")
+		cinematX.IMGNAME_NPCICON_QUEST_N 		=	cinematX.getImagePath ("npcIcon_QuestNew.png")
+		cinematX.IMGNAME_NPCICON_PRESSUP 		=	cinematX.getImagePath ("npcIcon_PressUp.png")
+		
+	
+	
 		-- Image slot and filename constants
+		cinematX.IMGREF_BLANK				=	Graphics.loadImage (cinematX.IMGNAME_BLANK)
+		cinematX.IMGREF_LETTERBOX 			=	Graphics.loadImage (cinematX.IMGNAME_LETTERBOX)
+		cinematX.IMGREF_FULLOVERLAY			=	Graphics.loadImage (cinematX.IMGNAME_FULLOVERLAY)
+		cinematX.IMGREF_PLAYDIALOGBOX		=	Graphics.loadImage (cinematX.IMGNAME_PLAYDIALOGBOX)
+		cinematX.IMGREF_BOSSHP_RIGHT 		= 	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_RIGHT)
+		cinematX.IMGREF_BOSSHP_LEFT 		=	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_LEFT)
+		cinematX.IMGREF_BOSSHP_EMPTY 		= 	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_EMPTY)
+		cinematX.IMGREF_BOSSHP_FULL 		=	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_FULL)
+		cinematX.IMGREF_BOSSHP_BG 			=	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_BG)
+		
+		cinematX.IMGREF_RACEBG 				=	Graphics.loadImage (cinematX.IMGNAME_RACEBG)
+		cinematX.IMGREF_RACEPLAYER			=	Graphics.loadImage (cinematX.IMGNAME_RACEPLAYER)
+		cinematX.IMGREF_RACEOPPONENT		=	Graphics.loadImage (cinematX.IMGNAME_RACEOPPONENT)
+		
+		cinematX.IMGREF_HUDBOX				=	Graphics.loadImage (cinematX.IMGNAME_HUDBOX)
+		cinematX.IMGREF_NPCICON_T_O			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_TALK_O)	
+		cinematX.IMGREF_NPCICON_T_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_TALK_N)	
+		cinematX.IMGREF_NPCICON_Q_O			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_O)
+		cinematX.IMGREF_NPCICON_Q_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_N)	
+		cinematX.IMGREF_NPCICON_PRESSUP		=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_PRESSUP)
+		
+		
 		cinematX.IMGSLOT_HUD 				=	999998
 		cinematX.IMGSLOT_HUDBOX				=	999997
 		cinematX.IMGSLOT_NPCICON_T_O		=	999996
@@ -1085,55 +1243,36 @@ do
 		
 		cinematX.IMGSLOT_RACEOPPONENT		=	999991
 		cinematX.IMGSLOT_RACEPLAYER			=	999990
-		
-		
-		-- Color code constants
-		cinematX.COLOR_TRANSPARENT = 0xFFFFFF--0xFB009D
-		
-		-- Filename constants
-		cinematX.IMGNAME_BLANK	 				=	cinematX.resourcePath.."blankImage.bmp"
-		cinematX.IMGNAME_LETTERBOX 				=	cinematX.resourcePath.."letterbox.bmp"
-		cinematX.IMGNAME_FULLOVERLAY			=	cinematX.resourcePath.."fullScreenOverlay.bmp"
-		cinematX.IMGNAME_PLAYDIALOGBOX			=	cinematX.resourcePath.."playSubtitleBox.bmp"
-		cinematX.IMGNAME_BOSSHP_RIGHT 			= 	cinematX.resourcePath.."bossHP_right.bmp"
-		cinematX.IMGNAME_BOSSHP_LEFT 			=	cinematX.resourcePath.."bossHP_left.bmp"
-		cinematX.IMGNAME_BOSSHP_EMPTY 			= 	cinematX.resourcePath.."bossHP_midE.bmp"
-		cinematX.IMGNAME_BOSSHP_FULL 			=	cinematX.resourcePath.."bossHP_midF.bmp"
-		cinematX.IMGNAME_BOSSHP_BG 				=	cinematX.resourcePath.."bossHP_bg.bmp"
-		
-		cinematX.IMGNAME_RACEBG 				=	cinematX.resourcePath.."raceBg.bmp"
-		cinematX.IMGNAME_RACEPLAYER				=	cinematX.resourcePath.."racePlayer.bmp"
-		cinematX.IMGNAME_RACEOPPONENT			=	cinematX.resourcePath.."raceOpponent.bmp"
-		
-		cinematX.IMGNAME_HUDBOX					=	cinematX.resourcePath.."hudBox.bmp"
-		
-		cinematX.IMGNAME_NPCICON_TALK_O	 		=	cinematX.resourcePath.."npcIcon_TalkOld.bmp"
-		cinematX.IMGNAME_NPCICON_TALK_N 		=	cinematX.resourcePath.."npcIcon_TalkNew.bmp"
-		cinematX.IMGNAME_NPCICON_QUEST_O 		=	cinematX.resourcePath.."npcIcon_QuestOld.bmp"
-		cinematX.IMGNAME_NPCICON_QUEST_N 		=	cinematX.resourcePath.."npcIcon_QuestNew.bmp"
-		cinematX.IMGNAME_NPCICON_PRESSUP 		=	cinematX.resourcePath.."npcIcon_PressUp.bmp"		
+				
 		
 		
 		-- Stores the filename of the image loaded into IMGSLOT_HUD
 		cinematX.currentHudOverlay = ""
 		
 		
-		-- Set up the HUD overlay sprites
-		cinematX.refreshHUDOverlay ()
-		placeSprite (1, cinematX.IMGSLOT_HUD,    0, 0)
-		placeSprite (1, cinematX.IMGSLOT_HUDBOX, 0, 0)
-
+		cinematX.currentImageRef_hud		=	cinematX.IMGREF_BLANK
+		cinematX.currentImageRef_screen		=	cinematX.IMGREF_BLANK
+		
 		
 		-- Set up NPC icon sprites
-		loadImage (cinematX.IMGNAME_NPCICON_TALK_O,  cinematX.IMGSLOT_NPCICON_T_O,  cinematX.COLOR_TRANSPARENT)
-		loadImage (cinematX.IMGNAME_NPCICON_TALK_N,  cinematX.IMGSLOT_NPCICON_T_N,  cinematX.COLOR_TRANSPARENT)
-		loadImage (cinematX.IMGNAME_NPCICON_QUEST_O,  cinematX.IMGSLOT_NPCICON_Q_O,  cinematX.COLOR_TRANSPARENT)
-		loadImage (cinematX.IMGNAME_NPCICON_QUEST_N,  cinematX.IMGSLOT_NPCICON_Q_N,  cinematX.COLOR_TRANSPARENT)
-		loadImage (cinematX.IMGNAME_NPCICON_PRESSUP,  cinematX.IMGSLOT_NPCICON_PRESSUP,  cinematX.COLOR_TRANSPARENT)
+		Graphics.loadImage (cinematX.IMGNAME_NPCICON_TALK_O,  cinematX.IMGSLOT_NPCICON_T_O,  cinematX.COLOR_TRANSPARENT)
+		Graphics.loadImage (cinematX.IMGNAME_NPCICON_TALK_N,  cinematX.IMGSLOT_NPCICON_T_N,  cinematX.COLOR_TRANSPARENT)
+		Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_O,  cinematX.IMGSLOT_NPCICON_Q_O,  cinematX.COLOR_TRANSPARENT)
+		Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_N,  cinematX.IMGSLOT_NPCICON_Q_N,  cinematX.COLOR_TRANSPARENT)
+		Graphics.loadImage (cinematX.IMGNAME_NPCICON_PRESSUP,  cinematX.IMGSLOT_NPCICON_PRESSUP,  cinematX.COLOR_TRANSPARENT)
+		
 		
 		--loadImage (cinematX.IMGNAME_RACEBG,  		cinematX.IMGSLOT_RACEBG,	  	cinematX.COLOR_TRANSPARENT)
-		loadImage (cinematX.IMGNAME_RACEOPPONENT,	cinematX.IMGSLOT_RACEOPPONENT,  cinematX.COLOR_TRANSPARENT)
-		loadImage (cinematX.IMGNAME_RACEPLAYER,  	cinematX.IMGSLOT_RACEPLAYER,  	cinematX.COLOR_TRANSPARENT)
+		Graphics.loadImage (cinematX.IMGNAME_RACEOPPONENT,	cinematX.IMGSLOT_RACEOPPONENT,  cinematX.COLOR_TRANSPARENT)
+		Graphics.loadImage (cinematX.IMGNAME_RACEPLAYER,  	cinematX.IMGSLOT_RACEPLAYER,  	cinematX.COLOR_TRANSPARENT)
+		
+		
+		-- Set up the HUD overlay sprites
+		--Graphics.placeSprite (1, cinematX.IMGSLOT_HUD,    0, 0)
+		--Graphics.placeSprite (1, cinematX.IMGSLOT_HUDBOX, 0, 0)
+		
+		
+		cinematX.refreshHUDOverlay ()
 	end
 	
 	function cinematX.initActors ()
@@ -1179,6 +1318,7 @@ end
 do
 
 	function cinematX.update ()
+	
 		-- Call level init
 		if  (cinematX.initCalledYet == false)  then
 			cinematX.initLevel ()
@@ -1233,7 +1373,7 @@ do
 		local lastFrameTime = cinematX.currentFrameTime
 		cinematX.currentFrameTime = os.clock ()
 		cinematX.deltaTime = cinematX.currentFrameTime - lastFrameTime
-		cinematX.wakeUpWaitingThreads (cinematX.deltaTime)  
+		--cinematX.wakeUpWaitingThreads (cinematX.deltaTime)  
 	end
 
 	function cinematX.updateScene ()
@@ -1311,13 +1451,14 @@ do
 			
 			--Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
 			if (uid == 0  and  isDying == false)  then
+				cinematX.npcCount = cinematX.npcCount + 1;
 				uid = cinematX.npcCount;
 				v:mem (cinematX.ID_MEM, FIELD_WORD, uid);
-				--windowDebug ("CHECK NPC ID: " .. v.id);
-				cinematX.npcCount = cinematX.npcCount + 1;
+				
 			elseif 	isDying == true  then
 				--windowDebug("Killed: "..v.msg.str);
 			end
+			
 			
 			--Have we already defined this actor? If so, then we update the SMBX reference accordingly.
 			if (cinematX.indexedActors[uid] ~= nil) then
@@ -1389,7 +1530,7 @@ do
 							 
 							-- Store key for use in getNPCFromKey() if parsed
 							if (parsedKey ~= nil) then
-								cinematX.npcMessageKeyIndexes[parsedKey] = i
+								cinematX.npcMessageKeyIndexes[parsedKey] = uid
 								--windowDebug ("key = "..parsedKey..", "..tostring(cinematX.npcMessageKeyIndexes[parsedKey])..", "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
 							end
 						 
@@ -1479,44 +1620,14 @@ do
 		end
 		
 		
-		-- Freeze the player
-		
-		if  playerInputActive == false   then
-			player:mem(0x122, FIELD_WORD, 0)
-			--[[
-			player.UKeyState = 0;
-			player.DKeyState = 0;
-			player.LKeyState = 0;
-			player.RKeyState = 0;
-			player.JKeyState = 0;
-			player.SJKeyState = 0;
-			player.RKeyState = 0;
-			
-			player:mem(0x04, FIELD_WORD, 1)
-			player:mem(0x06, FIELD_WORD, 0)
-			
-			player:mem(0xF2, FIELD_WORD, 0)
-			player:mem(0xF4, FIELD_WORD, 0)
-			player:mem(0xF6, FIELD_WORD, 0)
-			player:mem(0xF8, FIELD_WORD, 0)
-			player:mem(0xFA, FIELD_WORD, 0)
-			player:mem(0xFC, FIELD_WORD, 0)
-			player:mem(0x100, FIELD_WORD, 0)
-			
-			player:mem(0x118, FIELD_WORD, 0)
-			player:mem(0x11E, FIELD_WORD, 0)
-			player:mem(0x120, FIELD_WORD, 0)
-			player:mem(0x122, FIELD_WORD, -1)
-			--]]
-		else
-			--[[
-			player:mem(0x04, FIELD_WORD, 0)
-			player:mem(0x06, FIELD_WORD, 1)
-			player:mem(0x122, FIELD_WORD, 0)
-			--]]
+		-- Hide the player
+		if  cinematX.playerHidden == true   then
+			player:mem (0x140, FIELD_WORD, 25)
+			player:mem (0x142, FIELD_WORD, 0)
 		end  
 	end
 
+	
 	function cinematX.updateNPCMessages ()
 		cinematX.currentMessageActor = nil
 			
@@ -1541,7 +1652,7 @@ do
 							-- Check interaction type and whether the player has already spoken to the NPC
 							local tempIconType = 0
 							local tempIconNew = 0
-							local tempIcon = cinematX.IMGSLOT_NPCICON_T_N
+							local tempIcon = cinematX.IMGREF_NPCICON_T_N
 							
 							if  (v.wordBubbleIcon ~= nil)   then
 								tempIconType = 10*v.wordBubbleIcon
@@ -1555,10 +1666,10 @@ do
 							-- Determine the icon type based on the above
 							local tempAdd = tempIconType + tempIconNew
 							
-							if  	(tempAdd == 00)  then  tempIcon = cinematX.IMGSLOT_NPCICON_T_N
-							elseif	(tempAdd == 01)  then  tempIcon = cinematX.IMGSLOT_NPCICON_T_O
-							elseif 	(tempAdd == 10)  then  tempIcon = cinematX.IMGSLOT_NPCICON_Q_N
-							elseif	(tempAdd == 11)  then  tempIcon = cinematX.IMGSLOT_NPCICON_Q_O
+							if  	(tempAdd == 00)  then  tempIcon = cinematX.IMGREF_NPCICON_T_N
+							elseif	(tempAdd == 01)  then  tempIcon = cinematX.IMGREF_NPCICON_T_O
+							elseif 	(tempAdd == 10)  then  tempIcon = cinematX.IMGREF_NPCICON_Q_N
+							elseif	(tempAdd == 11)  then  tempIcon = cinematX.IMGREF_NPCICON_Q_O
 							end
 								
 							
@@ -1579,7 +1690,7 @@ do
 								
 									-- Display the icon above the NPC
 								if  (v.wordBubbleIcon ~= nil)  then
-									placeSprite (2, tempIcon, v:getX()-8, v:getY()-64, "", 2)
+									Graphics.placeSprite (2, tempIcon, v:getX()-8, v:getY()-64, "", 2)
 								end
 							end
 						end
@@ -1635,6 +1746,8 @@ do
 	cinematX.memMonitorField = 1
 	cinematX.memMonitorScroll = 32
 	
+	cinematX.playerWarping = false
+	cinematX.playerWarpingPrev = false
 	
 	function cinematX.updateUI ()
 		
@@ -1642,6 +1755,92 @@ do
 		
 		-- MAIN HUD OVERLAY IS CHANGED WHEN cinematX.refreshHUDOverlay () IS CALLED
 		-- BELOW ARE ADDITIONAL UI ELEMENTS BASED ON THE SCENE STATE
+		
+		
+		-- TRANSITION OUT OF SECTIONS		
+		local playerForcedAnimState = player:mem (0x122, FIELD_WORD)
+		local playerWarpTimer = player:mem (0x15C, FIELD_WORD)
+		
+		cinematX.playerWarpingPrev = cinematX.playerWarping
+		cinematX.playerWarping = false
+		
+		if  (playerForcedAnimState == 3  or playerForcedAnimState == 7)  then
+			cinematX.playerWarping = true
+		end
+		
+		if  (cinematX.playerWarping == true)  then
+			if  (cinematX.playerWarpingPrev == false)  then
+				if  cinematX.transitionBetweenSections == true then
+					cinematX.fadeScreenOut (0.25)
+				end
+				
+			elseif   cinematX.screenTransitionAmt < 1  then
+				--player:mem (0x122, FIELD_WORD, 3)
+			end
+		end
+		
+		
+		-- SCREEN TINT
+		graphX.boxScreen (0,0, 800,600,  cinematX.screenTintColor)
+		
+		-- SCREEN FADE
+		local screenFadeCol = 0x00000000 + math.floor(lerp(0, 255, cinematX.screenTransitionAmt))
+		graphX.boxScreen (0,0, 800,600,  screenFadeCol)
+		
+		
+		-- MENU BOXES
+		if (cinematX.useNewUI == true  and   cinematX.canUseNewUI == true)  then
+		
+			-- Enable the hud
+			hud (true)
+
+			
+			-- DEBUG CONSOLE
+			if  	(cinematX.showConsole == true)									then
+				hud (false)
+				graphX.boxScreen (0,0, 800,600,  0x00000099)
+			
+			-- Race mode
+			elseif  (cinematX.currentSceneState  ==  cinematX.SCENESTATE_RACE)      then
+				cinematX.drawMenuBox (30,7, 740,72,  0x00000099)
+				cinematX.drawMenuBox (30,494, 740,82,  0x00000099)	
+
+			
+			-- Boss battle mode
+			elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_BATTLE)	then
+				cinematX.drawMenuBox (30,7, 740,72,  0x00000099)
+				cinematX.drawMenuBox (30,494, 740,82,  0x00000099)	
+			
+			-- Cutscene mode
+			elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_CUTSCENE)	then
+				graphX.boxScreen (0,0, 800,100,  0x000000FF)
+				graphX.boxScreen (0,468, 800,600-468,  0x000000FF)
+				
+				-- Disable the hud
+				hud (false)
+
+			
+			-- Play mode
+			elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_PLAY)		then
+				cinematX.drawMenuBox (30,7, 740,72,  0x00000099)
+				
+				if      (cinematX.dialogOn == true)       then
+					cinematX.drawMenuBox (2,468, 796,600-470,  0x00000099)
+				elseif  (cinematX.subtitleBox == true)    then
+					cinematX.drawMenuBox (30,500, 740,70,  0x00000099)
+				end
+			end
+		else
+
+			if  cinematX.currentImageRef_hud  ~=  nil	then
+				Graphics.placeSprite (1, cinematX.currentImageRef_hud, 0, 0, "", 2)		
+			end
+			if  cinematX.currentImageRef_screen  ~=  nil	then
+				Graphics.placeSprite (1, cinematX.currentImageRef_screen, 0, 0, "", 2)		
+			end
+		end
+		
+		
 		
 		-- RACE PROGRESS
 		if   cinematX.currentSceneState == cinematX.SCENESTATE_RACE   then
@@ -1652,15 +1851,19 @@ do
 			local barY = 520
 			
 			if (racePlayerIconX > raceEnemyIconX)  then
-				placeSprite (1, cinematX.IMGSLOT_RACEOPPONENT,    raceEnemyIconX, barY, "", 2)
-				placeSprite (1, cinematX.IMGSLOT_RACEPLAYER,    racePlayerIconX, barY, "", 2)
+				Graphics.placeSprite (1, cinematX.IMGSLOT_RACEOPPONENT,    raceEnemyIconX, barY, "", 2)
+				Graphics.placeSprite (1, cinematX.IMGSLOT_RACEPLAYER,    racePlayerIconX, barY, "", 2)
 			else
-				placeSprite (1, cinematX.IMGSLOT_RACEPLAYER,    racePlayerIconX, barY, "", 2)
-				placeSprite (1, cinematX.IMGSLOT_RACEOPPONENT,    raceEnemyIconX, barY, "", 2)			
+				Graphics.placeSprite (1, cinematX.IMGSLOT_RACEPLAYER,    racePlayerIconX, barY, "", 2)
+				Graphics.placeSprite (1, cinematX.IMGSLOT_RACEOPPONENT,    raceEnemyIconX, barY, "", 2)			
 			end
 		end
 			
 		-- BOSS HP BAR
+		if  cinematX.bossHPEase > cinematX.bossHP  then
+			cinematX.bossHPEase = cinematX.bossHPEase - 0.025
+		end
+		
 		if  cinematX.currentSceneState == cinematX.SCENESTATE_BATTLE   then
 
 			-- Boss Name
@@ -1692,7 +1895,14 @@ do
 					--placeSprite (1, sprImg, sprX, barY, "", 1)
 				end
 
+			
+			-- BAR 2 -- horizontal, bar-based, center-aligned
+			elseif	(cinematX.bossHPDisplayType == cinematX.BOSSHPDISPLAY_BAR2)		then
 				
+				cinematX.drawProgressBarLeft (50,530, 700,32,  0xBB0000FF,  cinematX.bossHPEase/cinematX.bossHPMax)
+				cinematX.drawProgressBarLeft (50,530, 700,32,  0x009900FF,  cinematX.bossHP/cinematX.bossHPMax)
+			
+			
 			-- HITS -- Just display the current and max hits
 			elseif	(cinematX.bossHPDisplayType == cinematX.BOSSHPDISPLAY_HITS)		then
 				cinematX.printCenteredText (cinematX.bossHP.."/"..cinematX.bossHPMax, 4, 400, 550)
@@ -1758,14 +1968,14 @@ do
 
 				
 				-- Display cheat input string
-				local cheatStr = getInput().str
+				local cheatStr = Misc.cheatBuffer ()
 				if  (cheatStr ~= nil)  then
 					printText ("INPUT: " .. getInput().str, 4, 20, 580)
 				end
 				
 			else
 				-- Disable cheating when the console is not open
-				getInput():clear ()
+				Misc.cheatBuffer ("")
 			end
 			--]]
 			
@@ -2027,7 +2237,7 @@ do
 		
 		if  (string.find (tempStr, cheatString..""))  then
 			cinematX.showConsole = false
-			playSFX (0)
+			cinematX.playSFXSingle (0)
 			isTrue = true
 			getInput():clear ()
 		end
@@ -2053,6 +2263,24 @@ do
 		cinematX.playerActor.framesSinceJump = 0
 	end
 	
+
+	-- OVERRIDE PLAYER MOVEMENT DURING CUTSCENES ---------------
+	function cinematX.onInputUpdate ()		
+		if  (cinematX.currentSceneState   ==  cinematX.SCENESTATE_CUTSCENE)  then
+			player.upKeyPressing = false
+			player.downKeyPressing = false
+			player.leftKeyPressing = false
+			player.rightKeyPressing = false
+			player.jumpKeyPressing = false
+			player.altJumpKeyPressing = false
+			--player.runKeyPressing = false
+			--player.altRunKeyPressing = false
+			player.dropItemKeyPressing = false
+		end
+	end
+
+	
+	
 	function cinematX.onKeyUp (keycode)
 		
 		-- Stop gauging the strength of the player's jump
@@ -2073,12 +2301,12 @@ do
 			if  (cinematX.dialogIsQuestion == true)  then
 				if (keycode == KEY_LEFT) then
 					cinematX.questionPlayerResponse = true
-					playSFX (3)
+					cinematX.playSFXSingle (3)
 				end
 			
 				if (keycode == KEY_RIGHT) then
 					cinematX.questionPlayerResponse = false
-					playSFX (3)
+					cinematX.playSFXSingle (3)
 				end
 			end
 			
@@ -2094,9 +2322,9 @@ do
 				elseif  (cinematX.dialogEndWithInput == true)   then
 				
 					if  (cinematX.dialogIsQuestion == true  and  cinematX.questionPlayerResponse == nil)  then
-						playSFX (10) -- 10 = skid, 14 = coin, 23 = shckwup
+						cinematX.playSFXSingle (10) -- 10 = skid, 14 = coin, 23 = shckwup
 					else
-						playSFX (23) -- 10 = skid, 14 = coin, 23 = shckwup
+						cinematX.playSFXSingle (23) -- 10 = skid, 14 = coin, 23 = shckwup
 						cinematX.endDialogLine ()
 					end
 				end
@@ -2208,25 +2436,16 @@ do
 	cinematX.CURRENT_TIME = 0
 	
 	
-	function cinematX.waitSeconds (seconds)
-		-- Grab a reference to the current running coroutine.
-		local co = coroutine.running ()
-		
-		-- Store it in cinematX for good measure.
-		cinematX.currentCoroutine = co
-	 
-	 
-		-- If co is nil, that means we're on the main process, which isn't a coroutine and can't yield
-		assert (co ~= nil, "The main thread cannot wait!")
-	 
-		-- Store the coroutine and its wakeup time in the WAITING_ON_TIME table
-		local wakeupTime = cinematX.CURRENT_TIME + seconds
-		cinematX.WAITING_ON_TIME [co] = wakeupTime
-	    
-		cinematX.toConsoleLog ("Begin waiting for " .. tostring(seconds) .. " seconds")
+	function cinematX.yield ()
+		return eventu.waitFrames (0)
+	end
 
-		-- And suspend the process
-		return coroutine.yield (co)
+	function cinematX.waitFrames (frames)
+		return eventu.waitFrames (frames)
+	end
+	
+	function cinematX.waitSeconds (seconds)
+		return eventu.waitSeconds (seconds)		
 	end
 	
 	
@@ -2257,10 +2476,18 @@ do
 	end
 	 
 	function cinematX.runCoroutine (func)
+		return eventu.run (func)
+		
+		
+		--[[  OLD FUNCTION
+		
 		-- This function is just a quick wrapper to start a coroutine.
 		
-		local co = coroutine.create (func)
-		return coroutine.resume (co)
+		if (func ~= nil) then
+			local co = coroutine.create (func)
+			return coroutine.resume (co)
+		end
+		--]]
 	end
 	 
 	 
@@ -2396,8 +2623,8 @@ do
 	function cinematX.configDialog (skippable, needInput, textSpeed)
 		--cinematX.dialogPause = pause
 		cinematX.setDialogSkippable (skippable)
-		cinematX.setDialogInputWait (needInput)
-		cinematX.setDialogSpeed (textSpeed)
+		cinematX.setDialogInputWait (needInput or true)
+		cinematX.setDialogSpeed (textSpeed or 1)
 	end
 	
 	function cinematX.setDialogSpeed (textSpeed)
@@ -2474,19 +2701,23 @@ do
 
 	
 	function cinematX.startDialog (speakerActor, name, text, textTime, speakTime, sound)
+		local txtTime = textTime or 30
+		local spkTime = speakTime or 30
+		local snd = sound or ""
+		
 		--windowDebug ("TEST C")
 				
 		-- Voice clip
-		if  cinematX.dialogOn == false  and  sound ~= ""  then
-			playSFXSDL (sound)
+		if  cinematX.dialogOn == false  and  snd ~= ""  then
+			cinematX.playSFXSDLSingle (snd)
 		end
 		
 		--NPC speaking animation
 		if   (speakerActor ~= nil  and  speakerActor ~= -1)   then
-			cinematX.triggerDialogSpeaker (speakerActor, speakTime)
+			cinematX.triggerDialogSpeaker (speakerActor, spkTime)
 		end
 		
-		cinematX.triggerDialogText (name, text, textTime)
+		cinematX.triggerDialogText (name, text, txtTime)
 		cinematX.dialogOn = true
 	end
 	
@@ -2630,6 +2861,7 @@ do
 		
 		cinematX.bossHPMax = hits
 		cinematX.bossHP = cinematX.bossHPMax
+		cinematX.bossHPEase = cinematX.bossHP
 		
 		cinematX.bossHPDisplayType = barType
 		cinematX.changeSceneMode (cinematX.SCENESTATE_BATTLE)
@@ -2649,15 +2881,17 @@ do
 		cinematX.bossHP = cinematX.bossHP - amount
 		
 		if cinematX.bossHP <= 0 then
-			cineatX.winBattle ()
+			cinematX.winBattle ()
 		end
 	end
-		
+	
+	--[[
 	function cinematX.winBattle ()
 	end
 	
 	function cinematX.loseBattle ()
 	end
+	--]]
 end
 
  
@@ -2791,6 +3025,42 @@ do
 		player:mem (0x112, FIELD_WORD, cinematX.tempPlayerState)
 	end
 	
+	
+	
+	
+	tintColS = 0x00000000
+	tintColE = 0x00000000
+	tintLerpTime = 0
+	
+	function cinematX.setScreenTint (newCol)
+		cinematX.screenTintColor = col
+	end
+	
+	function cinematX.lerpScreenTint (newCol, timeAmt)
+		tintColS = cinematX.screenTintColor
+		tintColE = newCol
+		tintLerpTime = timeAmt
+		cinematX.runCoroutine (cor_lerpScreenTint)
+	end
+	
+	
+	function cor_lerpScreenTint ()
+		local colTime = tintLerpTime
+		local colS = tintColS
+		local colE = tintColE
+		
+		local currentTime = 0
+		
+		while  currentTime < colTime  do
+			local lerpAmt = invLerp (0, colTime, currentTime)
+			local col = lerp (colS, colE, lerpAmt)
+			cinematX.screenTintColor = col
+			currentTime = currentTime + cinematX.deltaTime
+			cinematX.waitSeconds(0.0)
+		end
+	end
+	
+	
 	function cinematX.enterCameraMode ()
 		cinematX.savePlayerPosition ()
 		cinematX.cameraFocusX = player.x --0.5*(Player.screen.left + Player.screen.right)
@@ -2803,6 +3073,7 @@ do
 			player:mem (0x112, FIELD_WORD, 0)
 			cinematX.restorePlayerPosition ()
 	end
+	
 	
 	function cinematX.runCutscene (func)
 		cinematX.changeSceneMode (cinematX.SCENESTATE_CUTSCENE)
@@ -2823,12 +3094,19 @@ do
 		
 	function cinematX.changeSceneMode (sceneModeType)	
 		cinematX.currentSceneState = sceneModeType
-		cinematX.refreshHUDOverlay ()
 		cinematX.toConsoleLog ("SWITCH TO STATE "..cinematX.currentSceneState)
 
 	end
+
 	
+	
+
 	function cinematX.refreshHUDOverlay ()
+		if (cinematX.useNewUI == true  and  cinematX.canUseNewUI == true)  then
+			cinematX.changeHudOverlay (cinematX.IMGREF_BLANK)
+			return;
+		end
+	
 		-- Enable the hud
 		hud (true)
 
@@ -2836,19 +3114,19 @@ do
 		-- DEBUG CONSOLE
 		if  	(cinematX.showConsole == true)									then
 			hud (false)
-			cinematX.changeHudOverlay (cinematX.IMGNAME_FULLOVERLAY)		
+			cinematX.changeHudOverlay (cinematX.IMGREF_FULLOVERLAY)		
 		
 		-- Race mode
 		elseif  (cinematX.currentSceneState  ==  cinematX.SCENESTATE_RACE)      then
-			cinematX.changeHudOverlay (cinematX.IMGNAME_RACEBG)
+			cinematX.changeHudOverlay (cinematX.IMGREF_RACEBG)
 		
 		-- Boss battle mode
 		elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_BATTLE)	then
-			cinematX.changeHudOverlay (cinematX.IMGNAME_BOSSHP_BG)		
+			cinematX.changeHudOverlay (cinematX.IMGREF_BOSSHP_BG)		
 		
 		-- Cutscene mode
 		elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_CUTSCENE)	then
-			cinematX.changeHudOverlay (cinematX.IMGNAME_LETTERBOX)
+			cinematX.changeHudOverlay (cinematX.IMGREF_LETTERBOX)
 			
 			-- Disable the hud
 			hud (false)
@@ -2858,31 +3136,197 @@ do
 		elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_PLAY)		then
 
 			if      (cinematX.dialogOn == true)       then
-				cinematX.changeHudOverlay (cinematX.IMGNAME_PLAYDIALOGBOX)
+				cinematX.changeHudOverlay (cinematX.IMGREF_PLAYDIALOGBOX)
 			elseif  (cinematX.subtitleBox == true)    then
-				cinematX.changeHudOverlay (cinematX.IMGNAME_BOSSHP_BG)
+				cinematX.changeHudOverlay (cinematX.IMGREF_BOSSHP_BG)
 			else
-				cinematX.changeHudOverlay (cinematX.IMGNAME_BLANK)
+				cinematX.changeHudOverlay (cinematX.IMGREF_BLANK)
 			end
 		end
 	end
 	
-	function cinematX.changeHudOverlay (imageName)
-		
-		if   (cinematX.currentHudOverlay  ~=  imageName)   then
-			-- Hud box
-			if   (imageName == cinematX.IMGNAME_LETTERBOX)  then
-				loadImage (cinematX.IMGNAME_BLANK,  cinematX.IMGSLOT_HUDBOX,  cinematX.COLOR_TRANSPARENT)
-			else
-				loadImage (cinematX.IMGNAME_HUDBOX,  cinematX.IMGSLOT_HUDBOX,  cinematX.COLOR_TRANSPARENT)
-			end
+	
+	function cinematX.changeHudOverlay (imageRef)
 
+		if   cinematX.currentImageRef_screen ~= imageRef   then
 			
-			-- Other overlay sprites	
-			loadImage (imageName,  cinematX.IMGSLOT_HUD,  cinematX.COLOR_TRANSPARENT)
-			cinematX.currentHudOverlay  =  imageName
+			
+			-- Screen overlay	
+			cinematX.currentImageRef_screen = imageRef
+			
+			
+			-- Hud box
+			if   imageRef == cinematX.IMGREF_LETTERBOX  or  cinematX.useHUDBox == false  then
+				cinematX.currentImageRef_hud = cinematX.IMGREF_BLANK
+			else
+				cinematX.currentImageRef_hud = cinematX.IMGREF_HUDBOX
+			end
 		end		
 	end	
+	
+	
+	
+	cinematX.changeSection_outTime = 0
+	cinematX.changeSection_inTime = 0
+	cinematX.changeSection_newSect = 0
+	
+	function cinematX.changeSection (newSection, outSeconds, inSeconds)
+		cinematX.changeSection_outTime = outSeconds or 1
+		cinematX.changeSection_inTime = inSeconds or 1
+		cinematX.changeSection_newSect = newSection or 1
+	
+		cinematX.runCoroutine (cinematX.cor_changeSection)
+	end
+
+	
+	function cinematX.cor_changeSection ()
+		local inTime = cinematX.changeSection_inTime
+		local outTime = cinematX.changeSection_outTime
+		local newSect = cinematX.changeSection_newSect
+		
+		cinematX.fadeScreenOut (outTime)
+		cinematX.waitSeconds (outTime)
+		
+		player:mem (0x15A, FIELD_WORD, newSect)
+		
+		cinematX.fadeScreenIn (inTime)
+	end
+	
+		
+	function cinematX.fadeScreenOut (seconds)
+		cinematX.screenTransitionTime = seconds or 1
+		cinematX.runCoroutine (cinematX.cor_fadeOut)
+	end
+
+	function cinematX.fadeScreenIn (seconds)
+		cinematX.screenTransitionTime = seconds or 1
+		cinematX.runCoroutine (cinematX.cor_fadeIn)
+	end
+	
+	
+	function cinematX.cor_fadeOut ()
+		currentTime = 0
+		cinematX.screenTransitionAmt = 0
+		
+		while (currentTime < cinematX.screenTransitionTime) do
+			currentTime = currentTime + cinematX.deltaTime
+			cinematX.screenTransitionAmt = math.min(1, currentTime/cinematX.screenTransitionTime)
+			cinematX.waitSeconds (0)
+		end
+		
+		cinematX.screenTransitionAmt = 1
+	end
+	
+	function cinematX.cor_fadeIn ()
+		currentTime = 0
+		cinematX.screenTransitionAmt = 1
+		
+		while (currentTime < cinematX.screenTransitionTime) do
+			currentTime = currentTime + cinematX.deltaTime
+			cinematX.screenTransitionAmt = math.max (1-(currentTime/cinematX.screenTransitionTime), 0)
+			cinematX.waitSeconds (0)
+		end
+		
+		cinematX.screenTransitionAmt = 0
+	end
+
+	
+	
+	function cinematX.drawMenuBorder (x,y,w,h)
+
+		-- Black outline
+		graphX.boxScreen (x-1,		y-1,	w+2,	3,		0x000000FF) -- Top
+		graphX.boxScreen (x-1,		y+h-1,	w+2,	3,		0x000000FF) -- Bottom
+		graphX.boxScreen (x-1,		y-1,	3,		h+2,	0x000000FF) -- Left
+		graphX.boxScreen (x+w-1,		y-1,	3,		h+2,	0x000000FF) -- Right
+		
+		-- White outline
+		graphX.boxScreen (x,			y,		w,		1,		0xFFFFFFFF) -- Top
+		graphX.boxScreen (x,			y+h,	w,		1,		0xFFFFFFFF) -- Bottom
+		graphX.boxScreen (x,			y,		1,		h,		0xFFFFFFFF) -- Left
+		graphX.boxScreen (x+w,		y,		1,		h,		0xFFFFFFFF) -- Right
+		
+	end
+
+	function cinematX.drawMenuBox (x,y,w,h, col)
+		-- Fill
+		graphX.boxScreen (x,y,w,h, col)		
+				
+		-- Border
+		cinematX.drawMenuBorder (x,y,w,h)
+	end
+	
+	function cinematX.drawProgressBarLeft (x,y,w,h, col, amt)		
+		-- Fill
+		graphX.boxScreen (x,	y,	w*amt,	h,	col)		
+				
+		-- Border
+		cinematX.drawMenuBorder (x,y,w,h)		
+	end
+	
+	function cinematX.drawProgressBarRight (x,y,w,h, col, amt)		
+		-- Fill
+		graphX.boxScreen (x + w*(1-amt),	y,	w*amt,	h,	col)		
+				
+		-- Border
+		cinematX.drawMenuBorder (x,y,w,h)		
+	end
+
+	function cinematX.drawProgressBarTop (x,y,w,h, col, amt)		
+		-- Fill
+		graphX.boxScreen (x,	y,	w,	h*amt,	col)		
+				
+		-- Border
+		cinematX.drawMenuBorder (x,y,w,h)		
+	end
+
+	function cinematX.drawProgressBarBottom (x,y,w,h, col, amt)		
+		-- Fill
+		graphX.boxScreen (x,	y + h*(1-amt),	w,	h*amt,	col)		
+				
+		-- Border
+		cinematX.drawMenuBorder (x,y,w,h)		
+	end
+
+	
+	
+	
+	cinematX.lastSFXPlayed = -1
+	cinematX.delaySFX = 0
+	cinematX.lastSFXSDLPlayed = ""
+	cinematX.delaySFXSDL = 0
+	
+
+	function cinematX.cor_SFXSingle ()
+		local delay = cinematX.delaySFX
+		playSFX (cinematX.lastSFXPlayed)
+		cinematX.waitSeconds (delay)
+		cinematX.lastSFXPlayed = -1
+	end
+	
+	function cinematX.cor_SFXSDLSingle ()
+		local delay = cinematX.delaySFXSDL
+		playSFXSDL (cinematX.lastSFXSDLPlayed)
+		cinematX.waitSeconds (delay)
+		cinematX.lastSFXSDLPlayed = ""
+	end
+	
+	function cinematX.playSFXSingle (sound, seconds)
+		if  cinematX.lastSFXPlayed ~= sound  then
+			cinematX.lastSFXPlayed = sound 
+			cinematX.delaySFX = seconds or 0.1
+			cinematX.runCoroutine (cinematX.cor_SFXSingle)
+		end
+	end
+
+	function cinematX.playSFXSDLSingle (sound, seconds)
+		if  cinematX.lastSFXSDLPlayed ~= sound  then
+			cinematX.lastSFXSDLPlayed = sound
+			cinematX.delaySFXSDL = seconds or 0.1
+			cinematX.runCoroutine (cinematX.cor_SFXSDLSingle)
+		end
+	end
+
 end
 
 	
@@ -2926,6 +3370,25 @@ do
 	
 	function invLerp (minVal, maxVal, amountVal)			
 		return  math.min(1.00000, math.max(0.0000, math.abs(amountVal-minVal) / math.abs(maxVal - minVal)))
+	end
+	
+	function normalize (x, y)
+		local vx = x
+		local vy = y
+		
+		local length = math.sqrt(vx * vx + vy * vy);
+
+		-- normalize vector
+		vx = vx/length;
+		vy = vy/length;
+
+		return vx,vy
+	end
+	
+	function hexToDec (hexVal)
+	end
+	
+	function decToHex (decVal)
 	end
 	
 	function cinematX.coordToSpawnX (xPos)
