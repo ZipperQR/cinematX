@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	cinematX.lua																		*
---  v0.0.8a                                                      						*
+--  v0.0.8b                                                      						*
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
 --	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
 --                                                                                      *
@@ -35,7 +35,8 @@ end
 do	
 	-- Resource path
 	cinematX.resourcePath = "..\\..\\..\\LuaScriptsLib\\cinematX\\"
-
+	cinematX.episodePath = "..\\"
+	
 	-- Checkpoint reached
 	cinematX.midpointReached = false
 	
@@ -124,6 +125,8 @@ do
 		thisActorObj.saidHello = false
 		thisActorObj.helloCooldown = 0
 
+		thisActorObj.blockToFollow = nil
+		thisActorObj.npcToFollow = nil
 		thisActorObj.actorToFollow = nil
 		thisActorObj.shouldTeleportToTarget = false
 		thisActorObj.distanceToFollow = 64
@@ -506,19 +509,95 @@ do
 		function Actor:dirToActorX (targetActor)
 			return self:dirToX (targetActor:getX())
 		end
+	
+	
+	
+		function Actor:closestNPC (id, maxDist)
+			local localNpcTable = NPC.get(id)
+			local closestRef = nil
+			local closestDistance = maxDist or 9999
+			
+			for k,v in pairs(localNpcTable)  do
+				local distanceToThisNPC = self:distancePos (v.x, v.y)
+				
+				if  distanceToThisNPC  <  closestDistance   then
+					closestRef = v
+					closestDistance = distanceToThisNPC
+				end
+			end
+			
+			return closestRef
+		end
+		
+		
+		function Actor:closestBlock (id, maxDist)
+			local blockTable = Block.get(id)
+			local closestRef = nil
+			local closestDistance = maxDist or 9999
+			
+			for k,v in pairs(blockTable)  do
+				local distanceToBlock = self:distancePos (v.x, v.y)
+				
+				if  distanceToBlock  <  closestDistance   and   v.invisible == false  then
+					closestRef = v
+					closestDistance = distanceToBlock
+				end
+			end
+			
+			return closestRef
+		end
+		
 	end
+	
+	
+	
+	
+	
 	
 	-- Movement
 	do
 		function Actor:followActor (targetActor, speed, howClose, shouldTeleport, easeDist)
 			self.shouldWalkToDest = true
 			self.actorToFollow = targetActor
-			self.distanceToFollow = howClose
-			self.destWalkSpeed = speed
+			self.distanceToFollow = howClose or 48
+			self.destWalkSpeed = speed or 8
+			
+			if shouldTeleport == nil  then
+				shouldTeleport = false
+			end
+			
 			self.shouldTeleportToTarget = shouldTeleport
 			
 			self.distanceToAccel = easeDist or 128
 		end
+	
+		
+		function Actor:followNPC (targetNPC, speed, howClose, shouldTeleport, easeDist)
+			self:walkToX (targetNPC.x, speed or 8, howClose or 48, easeDist or 128)
+			
+			if shouldTeleport == nil  then
+				shouldTeleport = false
+			end
+			
+			self.shouldTeleportToTarget = shouldTeleport
+		end		
+		
+		
+		function Actor:followBlock (targetBlock, speed, howClose, shouldTeleport, easeDist)
+			self.shouldWalkToDest = true
+			self.blockToFollow = targetBlock
+			self.distanceToFollow = howClose or 48
+			self.destWalkSpeed = speed or 8
+			
+			if shouldTeleport == nil  then
+				shouldTeleport = false
+			end
+			
+			self.shouldTeleportToTarget = shouldTeleport
+			
+			self.distanceToAccel = easeDist or 128
+		end
+	
 	
 		function Actor:stopFollowing ()
 			self.shouldWalkToDest = false
@@ -686,21 +765,54 @@ do
 		end
 		
 		
-		-- If following another actor, set their position as the destination X
+		-- If following a block, NPC or another actor, set their position as the destination X
+		local leaderToFollow = nil
+		local leaderX = 0
+		local leaderY = 0
+		local leaderJumpStrength = 0
+		local leaderJumpFrames = 0
+		local leaderDirection = DIR_LEFT
+		
+		
 		if (self.actorToFollow ~= nil) then
 			local leadActor = self.actorToFollow
 			
-			self.walkDestX = leadActor:getX()
+			leaderToFollow = leadActor
+			leaderX = leadActor:getX()
+			leaderY = leadActor:getY()
+			leaderJumpStrength = leadActor.jumpStrength
+			leaderJumpFrames = leadActor.framesSinceJump
+			leaderDirection = leadActor:getDirection ()
+		
+		elseif (self.blockToFollow ~= nil) then
+			leaderToFollow = self.blockToFollow
+			leaderX = self.blockToFollow.x
+			leaderY = self.blockToFollow.y
+			leaderJumpStrength = 8
+			leaderJumpFrames = 0
+			
+			if  (leaderY < self:getY()-64  and  self.onGround == true)  then
+				leaderJumpFrames = 13
+				leaderJumpStrength = math.min(14, (self:getY() - leaderY) * 0.25)
+
+			end
+			
+			leaderDirection = self:getDirection ()
+		end
+		
+		
+		if  leaderToFollow  ~=  nil		then
+			self.walkDestX = leaderX
 			
 			-- If the actor being followed just jumped and they are above me, jump shortly after
-			if  (leadActor.framesSinceJump == 13	and  
+			if  (leaderJumpFrames == 13	and  
 				 self:getSpeedY() == 0				and
-				 self:getY() > leadActor:getY()+64)	then
+				 self:getY() > leaderY+64)	then
 				 
-				self:jump (leadActor.jumpStrength * 0.5)			
+				self:jump (leaderJumpStrength * 0.5)			
 			
 			-- Swim
-			elseif  (self:getY() > leadActor:getY()+32) 	then
+			elseif  (self:getY() > leaderY+32) 	then
 				if      (self.isUnderwater == true)  then
 					self:jump (5)
 					self.isResurfacing = true
@@ -712,10 +824,10 @@ do
 			
 			
 			-- Teleport to the actor's position if too far away
-			if  (self:distanceActor(leadActor) > 350  and  self.shouldTeleportToTarget == true)   then
+			if  (self:distancePos(leaderX,leaderY) > 350  and  self.shouldTeleportToTarget == true)   then
 				
-				self:teleportToPosition (leadActor:getX () - self.distanceToFollow * leadActor:getDirection (),
-										 leadActor:getY () - 32)
+				self:teleportToPosition (leaderX - self.distanceToFollow * leaderDirection,
+										 leaderY - 32)
 			end
 		end
 		
@@ -843,12 +955,16 @@ end
 --       Show debug 			-- Pretty self-explanatory, displays a bunch of debug info so you	*
 --									can see if cinematX is behaving properly.						*
 --                                                                                                  *
---		 Section transition     -- Fade out when leaving a section via door, pipe, etc and fade		*
---									into the new section											*
+--		 Use hud box     		-- If true, displays a UI graphic behind the HUD 					*
 --                                                                                                  *
---		 Use New UI     		-- If true, UI elements will use the OpenGL renderer if it is		*
+--		 Use transitions     	-- If true, fade out when leaving a section via door, pipe, 		*
+--									etc and fade into the new section								*
+--                                                                                                  *
+--		 Use OpenGL UI     		-- If true, UI elements will use the OpenGL renderer if it is		*
 --									available and default to the old UI	otherwise; 					*
 --									if false, the old UI will always be used.						*
+--                                                                                                  *
+--		 Freeze in cutscenes  	-- If true, the player's movement will be frozen during cutscenes	*
 --***************************************************************************************************
 
 do
@@ -859,10 +975,11 @@ do
 	cinematX.transitionBetweenSections = true
 	cinematX.useNewUI = true
 	cinematX.useHUDBox = false
+	cinematX.freezeDuringCutscenes = true
 	
 	--cinematX.npcsToIgnore = {}
 	
-	function cinematX.config (toggleOverrideMsg, showDebug, useHUDBox, useTransitions, oglUI)
+	function cinematX.config (toggleOverrideMsg, showDebug, useHUDBox, useTransitions, oglUI, sceneFreeze)
 		
 		-- Set default values
 		if  toggleOverrideMsg 		== nil	then
@@ -880,6 +997,10 @@ do
 		if  oglUI 					== nil	then
 			oglUI = true
 		end	
+		if  sceneFreeze				== nil  then
+			sceneFreeze = true
+		end
+		
 
 	
 		-- Assign values
@@ -888,6 +1009,7 @@ do
 		cinematX.useHUDBox = useHUDBox
 		cinematX.transitionBetweenSections = useTransitions
 		cinematX.useNewUI = oglUI
+		cinematX.freezeDuringCutscenes = sceneFreeze
 	end
 end
 
@@ -1167,9 +1289,18 @@ do
 
 	
 	function cinematX.getImagePath (filename)		
+		--windowDebug ("TEST")
 		
-		if Misc.resolveFile (filename)  ~=  nil  then
-			return filename
+		local localImagePath = Misc.resolveFile (filename)  
+						
+		if  localImagePath  ~=  nil  then
+			return localImagePath
+			--return filename
+			
+			--[[
+			windowDebug ()
+			return cinematX.episodePath..filename
+			--]]
 		end
 		
 		return cinematX.resourcePath..filename
@@ -1816,6 +1947,7 @@ do
 				graphX.boxScreen (0,0, 800,100,  0x000000FF)
 				graphX.boxScreen (0,468, 800,600-468,  0x000000FF)
 				
+				
 				-- Disable the hud
 				hud (false)
 
@@ -1832,11 +1964,14 @@ do
 			end
 		else
 
+			
+				
+		
 			if  cinematX.currentImageRef_hud  ~=  nil	then
-				Graphics.placeSprite (1, cinematX.currentImageRef_hud, 0, 0, "", 2)		
+				Graphics.placeSprite (1, cinematX.currentImageRef_hud, 0, 0, "", 2)	
 			end
 			if  cinematX.currentImageRef_screen  ~=  nil	then
-				Graphics.placeSprite (1, cinematX.currentImageRef_screen, 0, 0, "", 2)		
+				Graphics.placeSprite (1, cinematX.currentImageRef_screen, 0, 0, "", 2)
 			end
 		end
 		
@@ -2266,7 +2401,7 @@ do
 
 	-- OVERRIDE PLAYER MOVEMENT DURING CUTSCENES ---------------
 	function cinematX.onInputUpdate ()		
-		if  (cinematX.currentSceneState   ==  cinematX.SCENESTATE_CUTSCENE)  then
+		if  (cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   and   cinematX.freezeDuringCutscenes == true)  then
 			player.upKeyPressing = false
 			player.downKeyPressing = false
 			player.leftKeyPressing = false
@@ -3078,6 +3213,7 @@ do
 	function cinematX.runCutscene (func)
 		cinematX.changeSceneMode (cinematX.SCENESTATE_CUTSCENE)
 		--cinematX.enterCameraMode ()
+		cinematX.refreshHUDOverlay ()
 		
 		return cinematX.runCoroutine (func)
 	end
@@ -3127,7 +3263,7 @@ do
 		-- Cutscene mode
 		elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_CUTSCENE)	then
 			cinematX.changeHudOverlay (cinematX.IMGREF_LETTERBOX)
-			
+					
 			-- Disable the hud
 			hud (false)
 
