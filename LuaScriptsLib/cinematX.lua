@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	cinematX.lua																		*
---  v0.0.8b                                                      						*
+--  v0.0.8c                                                      						*
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
 --	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
 --                                                                                      *
@@ -125,6 +125,23 @@ do
 		thisActorObj.saidHello = false
 		thisActorObj.helloCooldown = 0
 
+		
+		thisActorObj.carryStyle = 0  -- 0 = held in front, 1 = above head
+		thisActorObj.carriedNPC = nil
+		thisActorObj.carriedBlock = nil
+		thisActorObj.carriedObject = nil
+		thisActorObj.isCarrying = false
+		thisActorObj.playerCanStealCarried = true
+		
+		
+		thisActorObj.hpMax = 3
+		thisActorObj.hp = thisActorObj.hpMax
+		
+		
+		
+		thisActorObj.justThrownCounter = 0
+		
+		
 		thisActorObj.blockToFollow = nil
 		thisActorObj.npcToFollow = nil
 		thisActorObj.actorToFollow = nil
@@ -208,7 +225,6 @@ do
 			return self:getMem (cinematX.ID_MEM, FIELD_WORD)
 		end
 	end
-
 	
 	-- Getters and setters for movement vars
 	do
@@ -277,6 +293,18 @@ do
 
 			self.smbxObjRef.y = newY	   
 	    end	   
+	   
+		function Actor:getCenterX()
+			return self:getX() + self.smbxObjRef.width*0.5
+		end
+		
+		function Actor:getCenterY()
+			return self:getY() + self.smbxObjRef.height*0.5
+		end
+	   
+		function Actor:getBottomY()
+			return self:getY() + self.smbxObjRef.height()
+		end
 	   
 	    function Actor:getSpeedX()
 			if  (self.smbxObjRef == nil)  then  
@@ -422,14 +450,14 @@ do
 	end
 	
 	-- Relational
-	do
+	do		
 		function Actor:getScreenX ()
-			local myX = self:getX () - (player.x - player.screen.left)
+			local myX = self:getCenterX () - (player.x - player.screen.left)
 			return myX
 		end
 		
 		function Actor:getScreenY ()
-			local myY = self:getY () - (player.y - player.screen.top)
+			local myY = self:getCenterY () - (player.y - player.screen.top)
 			return myY
 		end
 		
@@ -448,11 +476,11 @@ do
 		end
 
 		function Actor:relativeX (posX)
-			return (posX - self.smbxObjRef.x)
+			return (posX - self:getCenterX())
 		end
 		 
 		function Actor:relativeY (posY)
-			return (posY - self.smbxObjRef.y)
+			return (posY - self:getCenterY())
 		end
 		 
 		function Actor:distanceX (posX)
@@ -495,7 +523,7 @@ do
 		end
 		
 		function Actor:distanceActor (targetActor)
-			return self:distancePos (targetActor:getX(), targetActor:getY())
+			return self:distancePos (targetActor:getCenterX(), targetActor:getCenterY())
 		end
 		 
 		function Actor:dirToX (posX)
@@ -507,13 +535,26 @@ do
 		end
 		 	 
 		function Actor:dirToActorX (targetActor)
-			return self:dirToX (targetActor:getX())
+			return self:dirToX (targetActor:getCenterX())
 		end
 	
 	
+		function Actor:forwardOffsetX (amount)
+			local returnval = self:getCenterX() + dirSign(self:getDirection())*amount
+			return returnval
+		end
+				
+		function Actor:topOffsetY (amount)
+			return self:getY() - amount
+		end
+		
+		function Actor:bottomOffsetY (amount)
+			return self:getBottomY() + amount
+		end
+	
 	
 		function Actor:closestNPC (id, maxDist)
-			local localNpcTable = NPC.get(id)
+			local localNpcTable = NPC.get(id,player.section)
 			local closestRef = nil
 			local closestDistance = maxDist or 9999
 			
@@ -528,7 +569,6 @@ do
 			
 			return closestRef
 		end
-		
 		
 		function Actor:closestBlock (id, maxDist)
 			local blockTable = Block.get(id)
@@ -549,10 +589,107 @@ do
 		
 	end
 	
-	
-	
-	
-	
+	-- Combat
+	do
+		tempMeleeActor = nil
+		tempMeleeXOffset = 0
+		tempMeleeYOffset = 0
+		tempMeleeMotionType = 0
+		tempMeleeDamageType = 0
+		tempMeleeAnimState = 0
+		tempMeleeCollider = nil
+		tempMeleeSeconds = 0
+		tempMeleeTargets = nil
+		
+		
+		function Actor:meleeAttack (collider, xOffset, yOffset, damageType, motionType, targets, seconds, animState)
+			tempMeleeActor = self
+			tempMeleeXOffset = xoffset
+			tempMeleeYOffset = yoffset
+			tempMeleeMotionType = motionType
+			tempMeleeDamageType = damageType
+			tempMeleeAnimState = animState
+			tempMeleeCollider = collider
+			tempMeleeSeconds = seconds
+			tempMeleeTargets = targets
+			
+			cinematX.runCoroutine (cor_meleeAttack)
+		end
+		
+		
+		function NPC:harm (damage)
+			local hits = self:mem (0x148, FIELD_FLOAT)
+			self:mem (0x148, FIELD_FLOAT, hits - damage)
+		end
+		
+		
+		function cor_meleeAttack ()
+			--[[
+				Motion types:
+					00 = Maintain current momentum (or lack thereof)
+					01 = Stop moving, then resume motion
+					02 = Stop moving for the attack
+					03 = Maintain horizontal, stop vertical
+					04 = Maintain vertical, stop horizontal
+			]]
+			local actor = tempMeleeActor
+			local moType = tempMeleeMotionType
+			local damType = tempMeleeDamageType
+			local xOff = tempMeleeXOffset
+			local yOff = tempMeleeYOffset
+			local animState = tempMeleeAnimState
+			local seconds = tempMeleeSeconds
+			local targets = tempMeleeTargets
+			
+			local tempSpeedX = actor:getSpeedX()
+			local tempSpeedY = actor:getSpeedY()
+			local tempAnimState = actor.animState
+			
+			local timePassed = 0
+			
+			actor.setAnimState (animState)
+			
+			while  (timePassed < seconds)  do
+				------ Control movement based on motion type ------
+				
+				-- Freeze completely
+				if moType == 1  or  moType == 2  then
+					actor:setSpeedX(0)
+					actor:setSpeedY(0)
+				end
+				
+				collider.x = actor:getCenterX() + xOff
+				collider.y = actor:getCenterY() + yOff
+				
+				
+				------ Process collision ------
+				for k,v in pairs(targets) do
+					if  (collisionResult == colliders.collide(collider, v)) == true  then
+						v:harm()
+					end					
+				end
+				
+				------ Loop ------
+				timePassed = timePassed + cinematX.deltaTime
+				cinematX.yield()
+			end
+			
+			actor:setAnimState (tempAnimState)
+			
+			if  moType == 1  then
+				actor:setSpeedX(tempSpeedX)
+				actor:setSpeedY(tempSpeedY)
+			end
+		end
+		
+		
+		function Actor:projectile (npcid, xOffset, yOffset, speedX, speedY)
+			local spawned = NPC.spawn (npcid, self:getCenterX() + xOffset, self:getCenterY() + yOffset,  player.section)
+			spawned.speedX = speedX
+			spawned.speedY = speedY
+			return spawned
+		end
+	end
 	
 	-- Movement
 	do
@@ -570,9 +707,9 @@ do
 			
 			self.distanceToAccel = easeDist or 128
 		end
-	
 		
 		function Actor:followNPC (targetNPC, speed, howClose, shouldTeleport, easeDist)
+			self.npcToFollow = targetNPC
 			self:walkToX (targetNPC.x, speed or 8, howClose or 48, easeDist or 128)
 			
 			if shouldTeleport == nil  then
@@ -581,8 +718,7 @@ do
 			
 			self.shouldTeleportToTarget = shouldTeleport
 		end		
-		
-		
+			
 		function Actor:followBlock (targetBlock, speed, howClose, shouldTeleport, easeDist)
 			self.shouldWalkToDest = true
 			self.blockToFollow = targetBlock
@@ -598,11 +734,65 @@ do
 			self.distanceToAccel = easeDist or 128
 		end
 	
-	
 		function Actor:stopFollowing ()
 			self.shouldWalkToDest = false
 			self.actorToFollow = nil
+			self.blockToFollow = nil
+			self.npcToFollow = nil
 		end
+	
+	
+		function Actor:grabNPC (npcRef, canStealFromPlayer, playerCanSteal)
+			local successful = false
+			local playerHeldIndex = player:mem(0x154, FIELD_WORD)
+			
+			if  canStealFromPlayer == nil  then
+				canStealFromPlayer = false
+			end
+			if  playerCanSteal == nil  then
+				playerCanSteal = true
+			end
+						
+			if  NPC(math.max(playerHeldIndex-1, 0)) ~= npcRef  then
+				successful = true
+			elseif  canStealFromPlayer == true  then
+				player:mem(0x154, FIELD_WORD, -1)
+				successful = true
+			end
+			
+			if  successful == true  then
+				self.isCarrying = true
+				self.carriedNPC = npcRef
+				cinematX.playSFXSingle (23)
+				self.playerCanStealCarried = playerCanSteal
+			end
+		end
+		
+		function Actor:dropCarried ()
+			self.isCarrying = false
+			self.carriedNPC:mem (0x136, FIELD_WORD, 0)
+			self.carriedNPC = nil
+		end
+		
+		function Actor:throwCarried (spdForward, spdUp)
+			if  self.carriedNPC == nil  then
+				self.isCarrying = false
+				return
+			end
+			
+			self.isCarrying = false
+			self.carriedNPC:mem (0x12C, FIELD_WORD, 0)
+			--self.carriedNPC.x = self.carriedNPC.x + dirSign(self:getDirection()) * 24
+			self.carriedNPC.speedX = dirSign(self:getDirection())  *  (spdForward  or 5)
+			self.carriedNPC.speedY = -1 * (spdUp  or  5)
+			cinematX.playSFXSingle (9)
+			
+			self.carriedNPC = nil
+			self.justThrownCounter = 30
+		end
+		
+		
+		
 	
 		function Actor:setSpawnX (newX)
 			self.smbxObjRef:mem(0xAC, FIELD_WORD, newX)
@@ -644,6 +834,10 @@ do
 			self:setDirection (self.savestateDir [slot])
 		end
 
+		
+		function Actor:lookAtActor (target)
+			self:setDirection (self:dirToActorX(target))
+		end
 		
 		function Actor:lookAtPlayer ()
 			local newDir = self:dirToActorX (cinematX.playerActor)
@@ -687,6 +881,71 @@ do
 			self.distanceToFollow = precision or 8
 			self.distanceToAccel = easeDist or 128
 		end
+		
+		
+		tempThisActor = nil
+		tempOtherActor = nil
+		tempDistance = 0
+		tempForcedDelay = 0
+		
+		function Actor:positionToTalk (otherActor, distance, shouldWait, forcedDelay)
+			tempThisActor = self
+			tempOtherActor = otherActor
+			tempDistance = distance  or  64
+			tempForcedDelay = forcedDelay  or  0
+			
+			cinematX.runCoroutine(cor_positionToTalk)
+			
+			if shouldWait == nil  then
+				shouldWait = false
+			end
+				
+			if shouldWait == true then
+				cinematX.waitSeconds(0.75)
+			end
+		end
+		
+		function cor_positionToTalk ()
+			--Text.showMessageBox ("talk positioning")
+			
+			local thisActor = tempThisActor
+			local otherActor = tempOtherActor
+			local distance = tempDistance
+			local forcedDelay = tempForcedDelay
+			
+			local tempShouldFace = thisActor.shouldFacePlayer
+			local positionedYet = false
+			local targetPos = 0
+			local offsetDir = otherActor:getDirection ()
+			local timePassed = 0
+			
+			thisActor:walk(0)
+			
+			while  positionedYet == false  or  timePassed < forcedDelay  do
+			
+				targetPos = otherActor:getCenterX() + distance*dirSign(offsetDir)
+				Text.print (tostring(targetPos), targetPos, thisActor:getCenterY()-64)
+				
+				thisActor.shouldFacePlayer = false
+				thisActor:walkToX (targetPos, 4, 1, 1)
+				
+				positionedYet = false
+				if  (math.abs(targetPos - thisActor:getCenterX()) <= 6)  then
+					positionedYet = true
+				end
+				timePassed = timePassed + cinematX.deltaTime
+				cinematX.yield()
+			end
+		
+			--Text.showMessageBox ("wrapping up talk positioning")
+			cinematX.waitSeconds(0.05)
+			thisActor:walk (0)
+			thisActor:lookAtActor (otherActor)
+			thisActor.shouldFacePlayer = tempShouldFace			
+			--Text.showMessageBox ("done with talk positioning")
+
+		end
+		
 		
 		function Actor:jump (strength)
 			--if  self.smbxObjRef == player  then
@@ -765,7 +1024,12 @@ do
 		end
 		
 		
-		-- If following a block, NPC or another actor, set their position as the destination X
+		-- Decrement just thrown counter
+		self.justThrownCounter = self.justThrownCounter - 1
+		
+		
+		-- Following behavior
+			-- if following a block, NPC or another actor, set their position as the destination X
 		local leaderToFollow = nil
 		local leaderX = 0
 		local leaderY = 0
@@ -773,18 +1037,19 @@ do
 		local leaderJumpFrames = 0
 		local leaderDirection = DIR_LEFT
 		
-		
 		if (self.actorToFollow ~= nil) then
 			local leadActor = self.actorToFollow
 			
 			leaderToFollow = leadActor
-			leaderX = leadActor:getX()
+			leaderX = leadActor:getCenterX()
 			leaderY = leadActor:getY()
 			leaderJumpStrength = leadActor.jumpStrength
 			leaderJumpFrames = leadActor.framesSinceJump
 			leaderDirection = leadActor:getDirection ()
+		end
 		
-		elseif (self.blockToFollow ~= nil) then
+		
+		if (self.blockToFollow ~= nil) then
 			leaderToFollow = self.blockToFollow
 			leaderX = self.blockToFollow.x
 			leaderY = self.blockToFollow.y
@@ -799,8 +1064,25 @@ do
 			
 			leaderDirection = self:getDirection ()
 		end
-		
-		
+			
+			
+		if (self.npcToFollow ~= nil) then
+			leaderToFollow = self.npcToFollow
+			leaderX = leaderToFollow.x
+			leaderY = leaderToFollow.y
+			leaderJumpStrength = 8
+			leaderJumpFrames = 0
+			
+			if  (leaderY < self:getY()-64  and  self.onGround == true  and  self.justThrownCounter < 1)  then
+				leaderJumpFrames = 13
+				leaderJumpStrength = math.min(14, (self:getY() - leaderY) * 0.25)
+
+			end
+			
+			leaderDirection = self:getDirection ()
+			
+		end
+			
 		if  leaderToFollow  ~=  nil		then
 			self.walkDestX = leaderX
 			
@@ -813,12 +1095,14 @@ do
 			
 			-- Swim
 			elseif  (self:getY() > leaderY+32) 	then
+				local tempDistAdd = math.max(1, self:distanceActor (cinematX.playerActor) / 64)
+				
 				if      (self.isUnderwater == true)  then
-					self:jump (5)
+					self:jump (5 + tempDistAdd)
 					self.isResurfacing = true
 				elseif 	(self.isResurfacing == true)  then
 					self.isResurfacing = false
-					self:jump (7)
+					self:jump (7 + tempDistAdd)
 				end
 			end
 			
@@ -828,6 +1112,44 @@ do
 				
 				self:teleportToPosition (leaderX - self.distanceToFollow * leaderDirection,
 										 leaderY - 32)
+			end
+		end
+		
+		
+		-- If the carried NPC is stolen by the player, either prevent it or stop carrying
+		local playerHeldIndex = player:mem(0x154, FIELD_WORD)
+		
+		if  NPC(math.max(playerHeldIndex-1, 0)) == self.carriedNPC   then
+			if  self.playerCanStealCarried  == false  then
+				--player:mem(0x154, FIELD_WORD, -1)
+			else
+				self.isCarrying = false
+				self.carriedNPC = nil
+			end
+		end
+		
+		
+		-- Control carrying
+		if  self.isCarrying ~= nil		then
+		
+			local carryX = self:getX() + 24*dirSign (self:getDirection ())
+			local carryY = self:getY() - 4
+			
+			if  self.carryStyle == 1  then
+				carryX = self:getX()
+				carryY = self:getY()-32
+			end
+			
+			if  self.carriedNPC ~= nil  then
+				self.carriedNPC:mem (0x136, FIELD_WORD, -1)
+				self.carriedNPC:mem (0x12C, FIELD_WORD, 2)
+				self.carriedNPC:mem (0x12E, FIELD_WORD, 30)
+				self.carriedNPC:mem (0x156, FIELD_WORD, 2)
+				self.carriedNPC.x = carryX
+				self.carriedNPC.y = carryY
+				self.carriedNPC.speedX = 0
+				self.carriedNPC.speedY = 0
+				
 			end
 		end
 		
@@ -903,10 +1225,7 @@ do
 			if (destDist < 0) then destDist = 0 end
 			
 			-- Get direction multiplier
-			local dirMult = -1
-			if self:dirToX (self.walkDestX) == DIR_RIGHT then 
-				dirMult = 1
-			end
+			local dirMult = dirSign (self:dirToX (self.walkDestX))
 			
 			-- Get acceleration multiplier
 			local accelMult = invLerp (0,self.distanceToAccel, destDist)
@@ -1524,19 +1843,6 @@ do
 		
 		--mem (cinematX.cameraXAddress, FIELD_DWORD, cinematX.cameraOffsetX)
 		--mem (cinematX.cameraYAddress, FIELD_DWORD, cinematX.cameraOffsetY)
-
-		
-
-		-- Unique behavior per cutscene mode
-		if      cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   then
-			cinematX.freezePlayerInput ()
-		elseif  cinematX.currentSceneState == cinematX.SCENESTATE_BATTLE     then  
-			--
-		elseif  cinematX.currentSceneState == cinematX.SCENESTATE_PLAY       then    
-			cinematX.unfreezePlayerInput ()
-		end  
-		
-		--windowDebug ("UPDATE SCENE")
 	end
 
 	
@@ -1561,6 +1867,7 @@ do
 	
 	-- Swap this for the location to store and read the NPC unique ID. 0x08 appears unused, but this can be changed to any unused word.
 	cinematX.ID_MEM =  0x08
+	cinematX.ID_MEM_FIELD =  FIELD_WORD
 	
 	function cinematX.indexActors (onlyIndexNew)
 		-- If configured not to generate actors, abort this function
@@ -1573,7 +1880,7 @@ do
 		
 		for k,v in pairs (npcs()) do
     
-			local uid = v:mem (cinematX.ID_MEM, FIELD_WORD);
+			local uid = v:mem (cinematX.ID_MEM, cinematX.ID_MEM_FIELD);
 			local isDying = false
 			if  (v:mem (0x122, FIELD_WORD)  >  0)  then
 				isDying = true
@@ -2073,7 +2380,6 @@ do
 				
 				if   (cinematX.dialogEndWithInput == true  and  cinematX.dialogTextTime <= 0)   then
 					printText("(PRESS X TO CONTINUE)", 4, 400, 580)
-					cinematX.unfreezePlayerInput ()
 				end
 
 			end			
@@ -2328,8 +2634,10 @@ do
 		end
 	end
 	
+	
 	function cinematX.updateDialog ()
 
+	
 		-- Display the text only revealed by the typewriter effect
 		local currentCharNum = math.floor (cinematX.dialogNumCharsCurrent)
 
@@ -2354,7 +2662,48 @@ do
 
 		if(cinematX.dialogSpeakerTime == 0) then
 			cinematX.dialogSpeaker = nil
-		end		
+		end	
+
+
+		-- DIALOG INPUT ------------------------------
+		if (cinematX.dialogOn == true) then
+			
+			-- Choose a response to a yes/no question
+			if  (cinematX.dialogIsQuestion == true)  then
+			
+				if (playerPressedLeft == true) then
+					cinematX.questionPlayerResponse = true
+					cinematX.playSFXSingle (3)
+				end
+			
+				if (playerPressedRight == true) then
+					cinematX.questionPlayerResponse = false
+					cinematX.playSFXSingle (3)
+				end
+			end
+			
+			-- Skip dialog if allowed
+			if  (playerPressedRun == true)  then
+				if (cinematX.dialogNumCharsCurrent < string.len (cinematX.dialogTextFull)
+						and  cinematX.dialogSkippable == true)  then
+					
+					cinematX.dialogNumCharsCurrent = string.len (cinematX.dialogTextFull)
+					cinematX.dialogTextTime = 0
+					cinematX.dialogSpeakerTime = 0
+				
+				elseif  (cinematX.dialogEndWithInput == true)   then
+				
+					if  (cinematX.dialogIsQuestion == true  and  cinematX.questionPlayerResponse == nil)  then
+						cinematX.playSFXSingle (10) -- 10 = skid, 14 = coin, 23 = shckwup
+					else
+						cinematX.playSFXSingle (26) -- 10 = skid, 14 = coin, 23 = shckwup
+						cinematX.endDialogLine ()
+					end
+				end
+			end
+		end
+
+		
 	end
 
 	-- cinematX-specific cheats
@@ -2398,18 +2747,82 @@ do
 		cinematX.playerActor.framesSinceJump = 0
 	end
 	
+	
+	playerPressedLeft = false
+	playerPressedRight = false
+	playerPressedRun = false
+	playerPressedJump = false
+	
+	playerLeftKeyStop = false
+	playerRightKeyStop = false
+	playerRunKeyStop = false
+	playerJumpKeyStop = false
+	
 
 	-- OVERRIDE PLAYER MOVEMENT DURING CUTSCENES ---------------
 	function cinematX.onInputUpdate ()		
 		if  (cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   and   cinematX.freezeDuringCutscenes == true)  then
 			player.upKeyPressing = false
 			player.downKeyPressing = false
+			
+			-- Dialogue input workaround
+			playerPressedLeft = false
+			playerPressedRight = false
+			playerPressedRun = false
+			playerPressedJump = false
+
+			
+			if  (player.leftKeyPressing == true)	then
+				
+				if  (playerLeftKeyStop == false)		then
+					playerPressedLeft = true
+					playerLeftKeyStop = true
+				end
+			else
+				playerLeftKeyStop = false			
+			end
+			
+			
+			if  (player.rightKeyPressing == true)	then
+				
+				if  (playerRightKeyStop == false)		then
+					playerPressedRight = true
+					playerRightKeyStop = true
+				end
+			else
+				playerRightKeyStop = false			
+			end
+			
+			
+			if  (player.runKeyPressing == true)		then
+				
+				if  (playerRunKeyStop == false)		then
+					playerPressedRun = true
+					playerRunKeyStop = true
+				end
+			else
+				playerRunKeyStop = false			
+			end		
+
+			
+			if  (player.jumpKeyPressing == true)	then
+				
+				if  (playerJumpKeyStop == false)		then
+					playerPressedJump = true
+					playerJumpKeyStop = true
+				end
+			else
+				playerJumpKeyStop = false			
+			end
+			
+
 			player.leftKeyPressing = false
 			player.rightKeyPressing = false
+			
 			player.jumpKeyPressing = false
 			player.altJumpKeyPressing = false
-			--player.runKeyPressing = false
-			--player.altRunKeyPressing = false
+			player.runKeyPressing = false
+			player.altRunKeyPressing = false
 			player.dropItemKeyPressing = false
 		end
 	end
@@ -2428,43 +2841,6 @@ do
 	function cinematX.onKeyDown (keycode)
 		--cinematX.toConsoleLog ("Key pressed: "..tostring(keycode))
 		
-		
-		-- DIALOG CONTROLS ------------------------------
-		if (cinematX.dialogOn == true) then
-			
-			-- Choose a response to a yes/no question
-			if  (cinematX.dialogIsQuestion == true)  then
-				if (keycode == KEY_LEFT) then
-					cinematX.questionPlayerResponse = true
-					cinematX.playSFXSingle (3)
-				end
-			
-				if (keycode == KEY_RIGHT) then
-					cinematX.questionPlayerResponse = false
-					cinematX.playSFXSingle (3)
-				end
-			end
-			
-			-- Skip dialog if allowed
-			if  (keycode == KEY_X)  then
-				if (cinematX.dialogNumCharsCurrent < string.len (cinematX.dialogTextFull)
-						and  cinematX.dialogSkippable == true)  then
-					
-					cinematX.dialogNumCharsCurrent = string.len (cinematX.dialogTextFull)
-					cinematX.dialogTextTime = 0
-					cinematX.dialogSpeakerTime = 0
-				
-				elseif  (cinematX.dialogEndWithInput == true)   then
-				
-					if  (cinematX.dialogIsQuestion == true  and  cinematX.questionPlayerResponse == nil)  then
-						cinematX.playSFXSingle (10) -- 10 = skid, 14 = coin, 23 = shckwup
-					else
-						cinematX.playSFXSingle (23) -- 10 = skid, 14 = coin, 23 = shckwup
-						cinematX.endDialogLine ()
-					end
-				end
-			end
-		end
 		
 		-- Speak to NPCs (if SMBX messages are being overridden)
 		if (keycode == KEY_UP    										and    
@@ -2501,52 +2877,6 @@ do
 			cinematX.memMonitorField = cinematX.memMonitorField + 1
 		end
 	end
-	
-	
-	--cinematX.tempVKeyTable = mem(0x00B25068, FIELD_DWORD)
-	
-	function cinematX.unfreezePlayerInput ()
-		cinematX.playerInputActive = true
-		--mem(0x00B25068, FIELD_DWORD, cinematX.tempVKeyTable)
-	end
-
-	function cinematX.freezePlayerInput ()
-		cinematX.playerInputActive = false
-		
-		--cinematX.tempVKeyTable = mem(0x00B25068, FIELD_DWORD)
-		--mem(0x00B25068, FIELD_DWORD, 0x00B00000)
-
-		--[[
-		if  playerInputActive == 0   then
-			player.UKeyState = 0;
-			player.DKeyState = 0;
-			player.LKeyState = 0;
-			player.RKeyState = 0;
-			player.JKeyState = 0;
-			player.SJKeyState = 0;
-			player.RKeyState = 0;
-			
-			player:mem(0x04, FIELD_WORD, 1)
-			player:mem(0x06, FIELD_WORD, 0)
-			
-			player:mem(0xF2, FIELD_WORD, 0)
-			player:mem(0xF4, FIELD_WORD, 0)
-			player:mem(0xF6, FIELD_WORD, 0)
-			player:mem(0xF8, FIELD_WORD, 0)
-			player:mem(0xFA, FIELD_WORD, 0)
-			player:mem(0xFC, FIELD_WORD, 0)
-			player:mem(0x100, FIELD_WORD, 0)
-			
-			player:mem(0x118, FIELD_WORD, 0)
-			player:mem(0x11E, FIELD_WORD, 0)
-			player:mem(0x120, FIELD_WORD, 0)
-		else
-			player:mem(0x04, FIELD_WORD, 0)
-			player:mem(0x06, FIELD_WORD, 1)
-		end  
-	--]]
-	end
-
 
 end
   
@@ -2611,8 +2941,9 @@ do
 	end
 	 
 	function cinematX.runCoroutine (func)
-		return eventu.run (func)
-		
+		if (func ~= nil)  then
+			return eventu.run (func)
+		end
 		
 		--[[  OLD FUNCTION
 		
@@ -3061,6 +3392,8 @@ do
 	function cinematX.displayQuestState (questKey)
 		local tempState = cinematX.getQuestState (questKey)
 		
+		cinematX.drawMenuBox (30,140,740,200, 0x00000099)
+		
 		if		tempState == 1  then
 			cinematX.printCenteredText ("QUEST ACCEPTED:", 4, 400, 200)
 		elseif	tempState == 2  then
@@ -3105,7 +3438,12 @@ do
 	end
 	
 	function cinematX.getQuestState (questKey)
-		return UserData.getValue("questState_" .. questKey)
+		local returnval = UserData.getValue("questState_" .. questKey)
+		if returnval == nil then
+			returnval = -1
+		end
+		
+		return returnval
 	end
 	
 	function cinematX.isQuestStarted (questKey)
@@ -3220,7 +3558,10 @@ do
 		
 	function cinematX.endCutscene ()
 		cinematX.changeSceneMode (cinematX.SCENESTATE_PLAY)
-		cinematX.unfreezePlayerInput ()
+		if  (cinematX.playerActor.shouldWalkToDest == true)  then
+			cinematX.playerActor:walk(0)
+		end
+			
 		--cinematX.exitCameraMode ()
 	end
 	
@@ -3500,6 +3841,17 @@ end
 --***************************************************************************************************
 
 do
+
+	function dirSign (direction)
+		local dirMult = -1
+		if direction == DIR_RIGHT then 
+			dirMult = 1
+		end
+		
+		return dirMult
+	end
+
+
 	function lerp (minVal, maxVal, percentVal)
 		return (1-percentVal) * minVal + percentVal*maxVal;
 	end
@@ -3601,7 +3953,13 @@ do
 	end
 	
 	function cinematX.getNPCName_Index (index)
-		return cinematX.npcMessageNames [index]
+		local returnval = cinematX.npcMessageNames [index]
+		
+		if returnval == nil  then
+			returnval = "NAME NOT FOUND ERROR"
+		end
+		
+		return returnval
 	end
 	
 	function cinematX.getActorName_Index (index)
