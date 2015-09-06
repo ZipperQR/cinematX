@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	cinematX.lua																		*
---  v0.0.8c                                                      						*
+--  v0.0.8d                                                      						*
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
 --	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
 --                                                                                      *
