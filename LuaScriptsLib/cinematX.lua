@@ -747,7 +747,7 @@ do
 			for k,v in pairs(localNpcTable)  do
 				local distanceToThisNPC = self:distancePos (v.x, v.y)
 				
-				if  distanceToThisNPC  <  closestDistance   then
+				if  distanceToThisNPC  <  closestDistance  and  v:mem(0x64, FIELD_WORD) == 0   then
 					closestRef = v
 					closestDistance = distanceToThisNPC
 				end
@@ -1278,8 +1278,8 @@ do
 			
 		if (self.npcToFollow ~= nil) then
 			leaderToFollow = self.npcToFollow
-			leaderX = leaderToFollow.x
-			leaderY = leaderToFollow.y
+			leaderX = leaderToFollow.x + (leaderToFollow.width*0.5)
+			leaderY = leaderToFollow.y + (leaderToFollow.height*0.5)
 			leaderJumpStrength = 8
 			leaderJumpFrames = 0
 			
@@ -1844,7 +1844,7 @@ do
 	function cinematX.initHUD ()
 		
 		-- Detect whether the computer can take advantage of the OpenGL renderer
-		cinematX.canUseNewUI = true
+		cinematX.canUseNewUI = Graphics.isOpenGLEnabled ()
 	
 		-- Color code constants
 		cinematX.COLOR_TRANSPARENT = 0xFFFFFF--0xFB009D
@@ -2407,7 +2407,7 @@ do
 		if  (cinematX.playerWarping == true)  then
 			if  (cinematX.playerWarpingPrev == false)  then
 				if  cinematX.transitionBetweenSections == true then
-					cinematX.fadeScreenOut (0.25)
+					cinematX.warpFade (0.25)
 				end
 				
 			elseif   cinematX.screenTransitionAmt < 1  then
@@ -3886,6 +3886,24 @@ do
 		player:mem (0x15A, FIELD_WORD, newSect)
 		
 		cinematX.fadeScreenIn (inTime)
+	end
+	
+		
+	
+	cinematX.warpFadeSeconds = 0
+	
+	function cinematX.warpFade (seconds)
+		cinematX.warpFadeSeconds = seconds
+		cinematX.runCoroutine (cor_warpFade)
+	end
+		
+	function cor_warpFade ()
+		local seconds = cinematX.warpFadeSeconds
+		
+		cinematX.fadeScreenOut (seconds)
+		cinematX.waitSeconds (seconds+0.2)
+		cinematX.fadeScreenIn (seconds)
+		
 	end
 	
 		
