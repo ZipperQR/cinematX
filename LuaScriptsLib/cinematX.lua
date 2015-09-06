@@ -56,18 +56,188 @@ do
 	cinematX.ANIMSTATE_JUMP    	 = 12
 	cinematX.ANIMSTATE_FALL    	 = 13
 	cinematX.ANIMSTATE_DEFEAT  	 = 14
-	cinematX.ANIMSTATE_ATTACK 	 = 15
-	cinematX.ANIMSTATE_ATTACK1 	 = 16
-	cinematX.ANIMSTATE_ATTACK2 	 = 17
-	cinematX.ANIMSTATE_ATTACK3 	 = 18
-	cinematX.ANIMSTATE_ATTACK4 	 = 19
-	cinematX.ANIMSTATE_ATTACK5 	 = 20
-	cinematX.ANIMSTATE_ATTACK6 	 = 21
-	cinematX.ANIMSTATE_ATTACK7 	 = 22
+	cinematX.ANIMSTATE_GRAB 	 = 15
+	cinematX.ANIMSTATE_GRABWALK	 = 16
+	cinematX.ANIMSTATE_GRABRUN	 = 17
+	cinematX.ANIMSTATE_GRABJUMP	 = 18
+	cinematX.ANIMSTATE_GRABFALL	 = 19
+	cinematX.ANIMSTATE_ATTACK 	 = 20
+	cinematX.ANIMSTATE_ATTACK1 	 = 21
+	cinematX.ANIMSTATE_ATTACK2 	 = 22
+	cinematX.ANIMSTATE_ATTACK3 	 = 23
+	cinematX.ANIMSTATE_ATTACK4 	 = 24
+	cinematX.ANIMSTATE_ATTACK5 	 = 25
+	cinematX.ANIMSTATE_ATTACK6 	 = 26
+	cinematX.ANIMSTATE_ATTACK7 	 = 27
 	
 	
 	-- Actor animation state table
 	cinematX.npcAnimStates = {}
+end
+
+cinematX.actorsGrabbingNPCs = {}
+
+
+
+--***************************************************************************************************
+--                                                                                                  *
+--              ANIMDATA PARSER																	    *
+--                                                                                                  *
+--***************************************************************************************************
+do
+	local function split(s,m)
+		local t={} ; i=1
+		for str in string.gmatch(s, "([^+"..m.."]+)") do
+			t[i] = str
+			i = i + 1
+		end
+		return t
+	end
+	 
+	local function trim(s)
+		return s:match'^()%s*$' and '' or s:match'^%s*(.*%S)'
+	end
+	 
+	
+	function cinematX.animDataAutofill (ad)
+	
+		if ad[cinematX.ANIMSTATE_TALK] == nil  then
+			ad[cinematX.ANIMSTATE_TALK] = ad[cinematX.ANIMSTATE_IDLE];
+		end
+
+		if ad[cinematX.ANIMSTATE_RUN] == nil  then
+			ad[cinematX.ANIMSTATE_RUN] = ad[cinematX.ANIMSTATE_WALK];
+		end
+
+		if ad[cinematX.ANIMSTATE_FALL] == nil  then
+			ad[cinematX.ANIMSTATE_FALL] = ad[cinematX.ANIMSTATE_JUMP];
+		end
+
+		if ad[cinematX.ANIMSTATE_GRAB] == nil  then
+			ad[cinematX.ANIMSTATE_GRAB] = ad[cinematX.ANIMSTATE_IDLE];
+		end
+
+		if ad[cinematX.ANIMSTATE_GRABWALK] == nil  then
+			ad[cinematX.ANIMSTATE_GRABWALK] = ad[cinematX.ANIMSTATE_WALK];
+		end		
+
+		if ad[cinematX.ANIMSTATE_GRABRUN] == nil  then
+			ad[cinematX.ANIMSTATE_GRABRUN] = ad[cinematX.ANIMSTATE_RUN];
+		end		
+
+		if ad[cinematX.ANIMSTATE_GRABJUMP] == nil  then
+			ad[cinematX.ANIMSTATE_GRABJUMP] = ad[cinematX.ANIMSTATE_JUMP];
+		end		
+
+		if ad[cinematX.ANIMSTATE_GRABFALL] == nil  then
+			ad[cinematX.ANIMSTATE_GRABFALL] = ad[cinematX.ANIMSTATE_FALL];
+		end		
+		
+		return ad;
+	end
+	 
+	 
+	function cinematX.readAnimData(path)
+		local p = Misc.resolveFile(path);
+		if(p == nil) then return nil; end
+		if(string.sub(p,-5) ~= ".anim") then
+			p = p..".anim";
+		end
+	   
+		local ad = {};
+		local f = io.open(p, "r");
+	   
+		for t in f:lines() do
+			local ts = split(t,"=");
+		   
+			if(#ts ~= 2) then
+				error("Parse error. Invalid line structure: "..t,2)
+			end
+				   
+			for k,v in ipairs(ts) do
+				ts[k] = string.lower(trim(v));
+			end
+		   
+			local cnt = false;
+			local index = 1;
+		   
+			if(ts[1]== "frames") then
+				ad[cinematX.ANIMSTATE_NUMFRAMES] = tonumber(ts[2]);
+                cnt=true;
+				if(ad[cinematX.ANIMSTATE_NUMFRAMES] == nil) then
+					error("Parse error. Not a valid frame number: "..ts[2],2)
+				end
+			elseif(ts[1] == "idle") then
+				index = cinematX.ANIMSTATE_IDLE;
+			elseif(ts[1] == "talk") then
+				index = cinematX.ANIMSTATE_TALK;
+			elseif(ts[1] == "talk1") then
+				index = cinematX.ANIMSTATE_TALK1;
+			elseif(ts[1] == "talk2") then
+				index = cinematX.ANIMSTATE_TALK2;
+			elseif(ts[1] == "talk3") then
+				index = cinematX.ANIMSTATE_TALK3;
+			elseif(ts[1] == "talk4") then
+				index = cinematX.ANIMSTATE_TALK4;
+			elseif(ts[1] == "talk5") then
+				index = cinematX.ANIMSTATE_TALK5;
+			elseif(ts[1] == "talk6") then
+				index = cinematX.ANIMSTATE_TALK6;
+			elseif(ts[1] == "talk7") then
+				index = cinematX.ANIMSTATE_TALK7;
+			elseif(ts[1] == "walk") then
+				index = cinematX.ANIMSTATE_WALK;
+			elseif(ts[1] == "run") then
+				index = cinematX.ANIMSTATE_RUN;
+			elseif(ts[1] == "jump") then
+				index = cinematX.ANIMSTATE_JUMP;
+			elseif(ts[1] == "fall") then
+				index = cinematX.ANIMSTATE_FALL;
+			elseif(ts[1] == "defeat") then
+				index = cinematX.ANIMSTATE_DEFEAT;
+			elseif(ts[1] == "attack") then
+				index = cinematX.ANIMSTATE_ATTACK;
+			elseif(ts[1] == "attack1") then
+				index = cinematX.ANIMSTATE_ATTACK1;
+			elseif(ts[1] == "attack2") then
+				index = cinematX.ANIMSTATE_ATTACK2;
+			elseif(ts[1] == "attack3") then
+				index = cinematX.ANIMSTATE_ATTACK3;
+			elseif(ts[1] == "attack4") then
+				index = cinematX.ANIMSTATE_ATTACK4;
+			elseif(ts[1] == "attack5") then
+				index = cinematX.ANIMSTATE_ATTACK5;
+			elseif(ts[1] == "attack6") then
+				index = cinematX.ANIMSTATE_ATTACK6;
+			elseif(ts[1] == "attack7") then
+				index = cinematX.ANIMSTATE_ATTACK7;
+			elseif(ts[1] == "grab") then
+				index = cinematX.ANIMSTATE_GRAB;
+			elseif(ts[1] == "grabwalk") then
+				index = cinematX.ANIMSTATE_GRABWALK;
+			elseif(ts[1] == "grabrun") then
+				index = cinematX.ANIMSTATE_GRABRUN;
+			elseif(ts[1] == "grabjump") then
+				index = cinematX.ANIMSTATE_GRABJUMP;
+			elseif(ts[1] == "grabfall") then
+				index = cinematX.ANIMSTATE_GRABFALL;
+			elseif(tonumber(ts[1]) ~= nil) then
+				index = tonumber(ts[1]);
+			elseif(tonumber(ts[1]) == nil) then
+				error("Parse error. Unknown frame label: "..ts[1],2)
+			end
+		   
+			if(not cnt) then
+					ad[index] = ts[2];
+			end
+		end
+		
+		ad = cinematX.animDataAutofill (ad);
+	   
+		return ad;
+	   
+	end
+
 end
 
 
@@ -131,7 +301,7 @@ do
 		thisActorObj.carriedBlock = nil
 		thisActorObj.carriedObject = nil
 		thisActorObj.isCarrying = false
-		thisActorObj.playerCanStealCarried = true
+		thisActorObj.carryPriority = 0
 		
 		
 		thisActorObj.hpMax = 3
@@ -182,7 +352,7 @@ do
 	end
 
 	
-	
+		
 	-- Memory functions
 	do
 		function Actor:getMem(offset,field)
@@ -222,7 +392,7 @@ do
 				return 0
 			end
 		
-			return self:getMem (cinematX.ID_MEM, FIELD_WORD)
+			return self:getMem (cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
 		end
 	end
 	
@@ -422,8 +592,10 @@ do
 						if    cinematX.dialogSpeaker == self   then
 							self:setAnimState (self.talkAnim)
 						else
-						
-							if (self:distanceActor (cinematX.playerActor) < 64) then
+							
+							if  self.isCarrying == true  then
+								self:setAnimState (cinematX.ANIMSTATE_GRAB)														
+							elseif (self:distanceActor (cinematX.playerActor) < 64) then
 								self:setAnimState (self.closeIdleAnim)
 							else
 								self:setAnimState (self.farIdleAnim)
@@ -432,7 +604,13 @@ do
 						end
 					else
 						if  math.abs (self:getSpeedX()) > 2  then
-							self:setAnimState (cinematX.ANIMSTATE_RUN)
+							if  self.isCarrying == true  then
+								self:setAnimState (cinematX.ANIMSTATE_GRABRUN)
+							else
+								self:setAnimState (cinematX.ANIMSTATE_RUN)
+							end
+						elseif  self.isCarrying == true  then
+							self:setAnimState (cinematX.ANIMSTATE_GRABWALK)
 						else
 							self:setAnimState (cinematX.ANIMSTATE_WALK)
 						end
@@ -440,9 +618,17 @@ do
 
 				-- If jumping or falling
 				elseif  self:getSpeedY() > 0 then
-					self:setAnimState (cinematX.ANIMSTATE_FALL)
+					if  self.isCarrying == true  then
+						self:setAnimState (cinematX.ANIMSTATE_GRABFALL)
+					else
+						self:setAnimState (cinematX.ANIMSTATE_FALL)
+					end
 				else
-					self:setAnimState (cinematX.ANIMSTATE_JUMP)
+					if  self.isCarrying == true  then
+						self:setAnimState (cinematX.ANIMSTATE_GRABJUMP)
+					else
+						self:setAnimState (cinematX.ANIMSTATE_JUMP)
+					end
 				end
 			end
 		end
@@ -742,35 +928,56 @@ do
 		end
 	
 	
-		function Actor:grabNPC (npcRef, canStealFromPlayer, playerCanSteal)
-			local successful = false
+	
+		function Actor:grabNPC (npcRef, priority)
+			local successful = true
 			local playerHeldIndex = player:mem(0x154, FIELD_WORD)
+			local npcUID = npcRef:mem(cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
+			local currentCarrierUID = cinematX.actorsGrabbingNPCs [npcUID]
+			local currentCarrierActor = cinematX.indexedActors [currentCarrierUID]
 			
-			if  canStealFromPlayer == nil  then
-				canStealFromPlayer = false
-			end
-			if  playerCanSteal == nil  then
-				playerCanSteal = true
-			end
-						
-			if  NPC(math.max(playerHeldIndex-1, 0)) ~= npcRef  then
-				successful = true
-			elseif  canStealFromPlayer == true  then
-				player:mem(0x154, FIELD_WORD, -1)
-				successful = true
+			self.carryPriority = priority  or  10
+			
+			
+			-- Check for stealing against another player
+			if  NPC(math.max(playerHeldIndex-1, 0)) == npcRef  then
+				if  priority >= 10  then
+					player:mem(0x154, FIELD_WORD, -1)
+				else
+					successful = false
+				end
 			end
 			
+			-- Check for stealing against another actor
+			if  currentCarrierUID ~= nil  then
+				if  currentCarrierActor.carryPriority <= priority 	then
+					currentCarrierActor:dropCarried ()
+					currentCarrierActor.isCarrying = false
+					currentCarrierActor.carriedNPC = nil
+					cinematX.actorsGrabbingNPCs[npcUID] = nil
+				else
+					successful = false
+				end
+			end
+				
+				
+			-- If steal checks were passed, pick it up 
 			if  successful == true  then
+				cinematX.actorsGrabbingNPCs[npcUID] = self.uid
 				self.isCarrying = true
 				self.carriedNPC = npcRef
 				cinematX.playSFXSingle (23)
-				self.playerCanStealCarried = playerCanSteal
+				self.carriedNPC:mem (0x136, FIELD_WORD, 3)
 			end
 		end
 		
 		function Actor:dropCarried ()
 			self.isCarrying = false
+			local npcUID = self.carriedNPC:mem(cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
+			
 			self.carriedNPC:mem (0x136, FIELD_WORD, 0)
+			cinematX.actorsGrabbingNPCs[npcUID] = nil
+						
 			self.carriedNPC = nil
 		end
 		
@@ -786,6 +993,9 @@ do
 			self.carriedNPC.speedX = dirSign(self:getDirection())  *  (spdForward  or 5)
 			self.carriedNPC.speedY = -1 * (spdUp  or  5)
 			cinematX.playSFXSingle (9)
+			
+			local npcUID = self.carriedNPC:mem(cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
+			cinematX.actorsGrabbingNPCs[npcUID] = nil
 			
 			self.carriedNPC = nil
 			self.justThrownCounter = 30
@@ -1115,23 +1325,28 @@ do
 			end
 		end
 		
-		
-		-- If the carried NPC is stolen by the player, either prevent it or stop carrying
-		local playerHeldIndex = player:mem(0x154, FIELD_WORD)
-		
-		if  NPC(math.max(playerHeldIndex-1, 0)) == self.carriedNPC   then
-			if  self.playerCanStealCarried  == false  then
-				--player:mem(0x154, FIELD_WORD, -1)
-			else
-				self.isCarrying = false
-				self.carriedNPC = nil
-			end
-		end
-		
+	
 		
 		-- Control carrying
-		if  self.isCarrying ~= nil		then
+		if  self.carriedNPC ~= nil		then
 		
+			-- If the carried NPC is stolen by the player, either prevent it or stop carrying
+			local playerHeldIndex = player:mem(0x154, FIELD_WORD)
+			local carriedUID = self.carriedNPC:mem (cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
+			
+			if  NPC(math.max(playerHeldIndex-1, 0)) == self.carriedNPC		then
+			
+				if  self.carryPriority  > 10  then
+					player:mem(0x154, FIELD_WORD, -1)
+				else
+					cinematX.actorsGrabbingNPCs [carriedUID] = nil
+					self.isCarrying = false
+					self.carriedNPC = nil
+				end
+			end
+
+				
+			-- Position the carried NPC above/in front of the actor
 			local carryX = self:getX() + 24*dirSign (self:getDirection ())
 			local carryY = self:getY() - 4
 			
@@ -1145,8 +1360,8 @@ do
 				self.carriedNPC:mem (0x12C, FIELD_WORD, 2)
 				self.carriedNPC:mem (0x12E, FIELD_WORD, 30)
 				self.carriedNPC:mem (0x156, FIELD_WORD, 2)
-				self.carriedNPC.x = carryX
-				self.carriedNPC.y = carryY
+				self.carriedNPC.x = carryX + self:getSpeedX()
+				self.carriedNPC.y = carryY + self:getSpeedY()
 				self.carriedNPC.speedX = 0
 				self.carriedNPC.speedY = 0
 				
@@ -1640,6 +1855,7 @@ do
 		cinematX.IMGNAME_LETTERBOX 				=	cinematX.getImagePath ("letterbox.png")
 		cinematX.IMGNAME_FULLOVERLAY			=	cinematX.getImagePath ("fullScreenOverlay.png")
 		cinematX.IMGNAME_PLAYDIALOGBOX			=	cinematX.getImagePath ("playSubtitleBox.png")
+		cinematX.IMGNAME_QUESTBOX				=	cinematX.getImagePath ("questBox.png")
 		cinematX.IMGNAME_BOSSHP_RIGHT 			= 	cinematX.getImagePath ("bossHP_right.png")
 		cinematX.IMGNAME_BOSSHP_LEFT 			=	cinematX.getImagePath ("bossHP_left.png")
 		cinematX.IMGNAME_BOSSHP_EMPTY 			= 	cinematX.getImagePath ("bossHP_midE.png")
@@ -1649,11 +1865,15 @@ do
 		cinematX.IMGNAME_RACEBG 				=	cinematX.getImagePath ("raceBg.png")
 		cinematX.IMGNAME_RACEPLAYER				=	cinematX.getImagePath ("racePlayer.png")
 		cinematX.IMGNAME_RACEOPPONENT			=	cinematX.getImagePath ("raceOpponent.png")
+		cinematX.IMGNAME_RACEFLAGSTART			=	cinematX.getImagePath ("raceFlag_Start.png")
+		cinematX.IMGNAME_RACEFLAGEND			=	cinematX.getImagePath ("raceFlag_End.png")
 		
 		cinematX.IMGNAME_HUDBOX					=	cinematX.getImagePath ("hudBox.png")
 		
 		cinematX.IMGNAME_NPCICON_TALK_O	 		=	cinematX.getImagePath ("npcIcon_TalkOld.png")
 		cinematX.IMGNAME_NPCICON_TALK_N 		=	cinematX.getImagePath ("npcIcon_TalkNew.png")
+		cinematX.IMGNAME_NPCICON_INSPECT_O 		=	cinematX.getImagePath ("npcIcon_InspectOld.png")
+		cinematX.IMGNAME_NPCICON_INSPECT_N 		=	cinematX.getImagePath ("npcIcon_InspectNew.png")
 		cinematX.IMGNAME_NPCICON_QUEST_O 		=	cinematX.getImagePath ("npcIcon_QuestOld.png")
 		cinematX.IMGNAME_NPCICON_QUEST_N 		=	cinematX.getImagePath ("npcIcon_QuestNew.png")
 		cinematX.IMGNAME_NPCICON_PRESSUP 		=	cinematX.getImagePath ("npcIcon_PressUp.png")
@@ -1664,6 +1884,7 @@ do
 		cinematX.IMGREF_BLANK				=	Graphics.loadImage (cinematX.IMGNAME_BLANK)
 		cinematX.IMGREF_LETTERBOX 			=	Graphics.loadImage (cinematX.IMGNAME_LETTERBOX)
 		cinematX.IMGREF_FULLOVERLAY			=	Graphics.loadImage (cinematX.IMGNAME_FULLOVERLAY)
+		cinematX.IMGREF_QUESTBOX			=	Graphics.loadImage (cinematX.IMGNAME_QUESTBOX)
 		cinematX.IMGREF_PLAYDIALOGBOX		=	Graphics.loadImage (cinematX.IMGNAME_PLAYDIALOGBOX)
 		cinematX.IMGREF_BOSSHP_RIGHT 		= 	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_RIGHT)
 		cinematX.IMGREF_BOSSHP_LEFT 		=	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_LEFT)
@@ -1672,6 +1893,8 @@ do
 		cinematX.IMGREF_BOSSHP_BG 			=	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_BG)
 		
 		cinematX.IMGREF_RACEBG 				=	Graphics.loadImage (cinematX.IMGNAME_RACEBG)
+		cinematX.IMGREF_RACEFLAGSTART		=	Graphics.loadImage (cinematX.IMGNAME_RACEFLAGSTART)
+		cinematX.IMGREF_RACEFLAGEND			=	Graphics.loadImage (cinematX.IMGNAME_RACEFLAGEND)
 		cinematX.IMGREF_RACEPLAYER			=	Graphics.loadImage (cinematX.IMGNAME_RACEPLAYER)
 		cinematX.IMGREF_RACEOPPONENT		=	Graphics.loadImage (cinematX.IMGNAME_RACEOPPONENT)
 		
@@ -1680,47 +1903,17 @@ do
 		cinematX.IMGREF_NPCICON_T_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_TALK_N)	
 		cinematX.IMGREF_NPCICON_Q_O			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_O)
 		cinematX.IMGREF_NPCICON_Q_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_N)	
+		cinematX.IMGREF_NPCICON_I_O			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_INSPECT_O)
+		cinematX.IMGREF_NPCICON_I_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_INSPECT_N)	
 		cinematX.IMGREF_NPCICON_PRESSUP		=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_PRESSUP)
 		
-		
-		cinematX.IMGSLOT_HUD 				=	999998
-		cinematX.IMGSLOT_HUDBOX				=	999997
-		cinematX.IMGSLOT_NPCICON_T_O		=	999996
-		cinematX.IMGSLOT_NPCICON_T_N		=	999995
-		cinematX.IMGSLOT_NPCICON_Q_O		=	999994
-		cinematX.IMGSLOT_NPCICON_Q_N		=	999993
-		cinematX.IMGSLOT_NPCICON_PRESSUP	=	999992
-		
-		cinematX.IMGSLOT_RACEOPPONENT		=	999991
-		cinematX.IMGSLOT_RACEPLAYER			=	999990
-				
 		
 		
 		-- Stores the filename of the image loaded into IMGSLOT_HUD
 		cinematX.currentHudOverlay = ""
 		
-		
 		cinematX.currentImageRef_hud		=	cinematX.IMGREF_BLANK
 		cinematX.currentImageRef_screen		=	cinematX.IMGREF_BLANK
-		
-		
-		-- Set up NPC icon sprites
-		Graphics.loadImage (cinematX.IMGNAME_NPCICON_TALK_O,  cinematX.IMGSLOT_NPCICON_T_O,  cinematX.COLOR_TRANSPARENT)
-		Graphics.loadImage (cinematX.IMGNAME_NPCICON_TALK_N,  cinematX.IMGSLOT_NPCICON_T_N,  cinematX.COLOR_TRANSPARENT)
-		Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_O,  cinematX.IMGSLOT_NPCICON_Q_O,  cinematX.COLOR_TRANSPARENT)
-		Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_N,  cinematX.IMGSLOT_NPCICON_Q_N,  cinematX.COLOR_TRANSPARENT)
-		Graphics.loadImage (cinematX.IMGNAME_NPCICON_PRESSUP,  cinematX.IMGSLOT_NPCICON_PRESSUP,  cinematX.COLOR_TRANSPARENT)
-		
-		
-		--loadImage (cinematX.IMGNAME_RACEBG,  		cinematX.IMGSLOT_RACEBG,	  	cinematX.COLOR_TRANSPARENT)
-		Graphics.loadImage (cinematX.IMGNAME_RACEOPPONENT,	cinematX.IMGSLOT_RACEOPPONENT,  cinematX.COLOR_TRANSPARENT)
-		Graphics.loadImage (cinematX.IMGNAME_RACEPLAYER,  	cinematX.IMGSLOT_RACEPLAYER,  	cinematX.COLOR_TRANSPARENT)
-		
-		
-		-- Set up the HUD overlay sprites
-		--Graphics.placeSprite (1, cinematX.IMGSLOT_HUD,    0, 0)
-		--Graphics.placeSprite (1, cinematX.IMGSLOT_HUDBOX, 0, 0)
-		
 		
 		cinematX.refreshHUDOverlay ()
 	end
@@ -1740,6 +1933,7 @@ do
 		
 		cinematX.playerControlMode = cinematX.PLAYERMODE_PLAY
 	end
+	
 	
 	function cinematX.initQuestSystem ()
 		--cinematX.defineQuest ("test", "Test Quest", "Test the quest the quest the test system")
@@ -2073,7 +2267,7 @@ do
 
 			cinematX.refreshHUDOverlay ()
 
-			cinematX.dialogOn = false
+			--cinematX.dialogOn = false
 			cinematX.subtitleBox = false
 			
 			for k,v in pairs (cinematX.indexedActors) do
@@ -2108,6 +2302,8 @@ do
 							elseif	(tempAdd == 01)  then  tempIcon = cinematX.IMGREF_NPCICON_T_O
 							elseif 	(tempAdd == 10)  then  tempIcon = cinematX.IMGREF_NPCICON_Q_N
 							elseif	(tempAdd == 11)  then  tempIcon = cinematX.IMGREF_NPCICON_Q_O
+							elseif 	(tempAdd == 20)  then  tempIcon = cinematX.IMGREF_NPCICON_I_N
+							elseif	(tempAdd == 21)  then  tempIcon = cinematX.IMGREF_NPCICON_I_O
 							end
 								
 							
@@ -2122,7 +2318,9 @@ do
 									
 									--tempIcon = cinematX.IMGSLOT_NPCICON_PRESSUP
 									cinematX.subtitleBox = true
-									cinematX.displayNPCSubtitle (v.nameString, "[UP] to "..v.talkTypeString..".")
+									if  cinematX.dialogOn == false  then
+										cinematX.displayNPCSubtitle (v.nameString, "[UP] to "..v.talkTypeString..".")
+									end
 								end
 									
 								
@@ -2242,12 +2440,15 @@ do
 			elseif  (cinematX.currentSceneState  ==  cinematX.SCENESTATE_RACE)      then
 				cinematX.drawMenuBox (30,7, 740,72,  0x00000099)
 				cinematX.drawMenuBox (30,494, 740,82,  0x00000099)	
+				
+				graphX.boxScreen (60,529, 680,14,  0x000000FF)
 
 			
 			-- Boss battle mode
 			elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_BATTLE)	then
 				cinematX.drawMenuBox (30,7, 740,72,  0x00000099)
 				cinematX.drawMenuBox (30,494, 740,82,  0x00000099)	
+			
 			
 			-- Cutscene mode
 			elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_CUTSCENE)	then
@@ -2286,24 +2487,29 @@ do
 		
 		-- RACE PROGRESS
 		if   cinematX.currentSceneState == cinematX.SCENESTATE_RACE   then
-			local raceMeterLeft = 56
-			local raceMeterRight = 800-72
+			local raceMeterLeft = 48
+			local raceMeterRight = 800-80
 			local racePlayerIconX = lerp (raceMeterLeft, raceMeterRight, cinematX.racePlayerPos)
 			local raceEnemyIconX = lerp (raceMeterLeft, raceMeterRight, cinematX.raceEnemyPos)
 			local barY = 520
+
+			Graphics.placeSprite (1, cinematX.IMGREF_RACEFLAGSTART,	raceMeterLeft, 		barY, "", 2)
+			Graphics.placeSprite (1, cinematX.IMGREF_RACEFLAGEND,	raceMeterRight, 	barY, "", 2)
+
 			
 			if (racePlayerIconX > raceEnemyIconX)  then
-				Graphics.placeSprite (1, cinematX.IMGSLOT_RACEOPPONENT,    raceEnemyIconX, barY, "", 2)
-				Graphics.placeSprite (1, cinematX.IMGSLOT_RACEPLAYER,    racePlayerIconX, barY, "", 2)
+				Graphics.placeSprite (1, cinematX.IMGREF_RACEOPPONENT, 	raceEnemyIconX, 	barY, "", 2)
+				Graphics.placeSprite (1, cinematX.IMGREF_RACEPLAYER,    racePlayerIconX, 	barY, "", 2)
 			else
-				Graphics.placeSprite (1, cinematX.IMGSLOT_RACEPLAYER,    racePlayerIconX, barY, "", 2)
-				Graphics.placeSprite (1, cinematX.IMGSLOT_RACEOPPONENT,    raceEnemyIconX, barY, "", 2)			
+				Graphics.placeSprite (1, cinematX.IMGREF_RACEPLAYER,   	racePlayerIconX, 	barY, "", 2)
+				Graphics.placeSprite (1, cinematX.IMGREF_RACEOPPONENT, 	raceEnemyIconX, 	barY, "", 2)			
 			end
 		end
 			
+			
 		-- BOSS HP BAR
 		if  cinematX.bossHPEase > cinematX.bossHP  then
-			cinematX.bossHPEase = cinematX.bossHPEase - 0.025
+			cinematX.bossHPEase = cinematX.bossHPEase - (cinematX.bossHPMax*0.0025)
 		end
 		
 		if  cinematX.currentSceneState == cinematX.SCENESTATE_BATTLE   then
@@ -2313,9 +2519,15 @@ do
 			
 			
 			-- Different HP bar types
+			local oglBarBranch = cinematX.bossHPDisplayType
+			
+			if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
+				oglBarBranch = cinematX.BOSSHPDISPLAY_HITS
+			end
+			
 			
 			-- BAR1 -- horizontal, unit-based, center-aligned (broken)
-			if		(cinematX.bossHPDisplayType == cinematX.BOSSHPDISPLAY_BAR1)		then
+			if		(oglBarBranch == cinematX.BOSSHPDISPLAY_BAR1)		then
 			
 				-- Bar sides
 				local barLeft = player.screen.left + 400 - (cinematX.bossHPMax * 16)
@@ -2339,14 +2551,14 @@ do
 
 			
 			-- BAR 2 -- horizontal, bar-based, center-aligned
-			elseif	(cinematX.bossHPDisplayType == cinematX.BOSSHPDISPLAY_BAR2)		then
+			elseif	(oglBarBranch == cinematX.BOSSHPDISPLAY_BAR2)		then
 				
 				cinematX.drawProgressBarLeft (50,530, 700,32,  0xBB0000FF,  cinematX.bossHPEase/cinematX.bossHPMax)
 				cinematX.drawProgressBarLeft (50,530, 700,32,  0x009900FF,  cinematX.bossHP/cinematX.bossHPMax)
 			
 			
 			-- HITS -- Just display the current and max hits
-			elseif	(cinematX.bossHPDisplayType == cinematX.BOSSHPDISPLAY_HITS)		then
+			elseif	(oglBarBranch == cinematX.BOSSHPDISPLAY_HITS)		then
 				cinematX.printCenteredText (cinematX.bossHP.."/"..cinematX.bossHPMax, 4, 400, 550)
 			end
 		end
@@ -3244,7 +3456,7 @@ do
 			--loadstring ("cinematXMain.runCutscene (__lunalocal."..tempFunctString..")") ()
 			
 		elseif  (thisActor.routineString ~= nil) then
-			tempFunctStr = thisActor.sceneString
+			tempFunctStr = thisActor.routineString
 			tempFunctA = loadstring ("return __lunalocal."..tempFunctStr)
 			tempFunctB = tempFunctA ()
 			--windowDebug (tempFunctStr .. " " .. type(tempFunctB))
@@ -3315,7 +3527,8 @@ do
 		cinematX.raceLoseRoutine = loseFunc
 		cinematX.raceWinRoutine = winFunc
 		
-		cinematX.changeSceneMode (cinematX.SCENESTATE_RACE)		
+		cinematX.changeSceneMode (cinematX.SCENESTATE_RACE)	
+		cinematX.refreshHUDOverlay ()
 		cinematX.raceActive = true
 		
 		cinematX.runCoroutine (raceFunc)
@@ -3331,6 +3544,7 @@ do
 		
 		cinematX.bossHPDisplayType = barType
 		cinematX.changeSceneMode (cinematX.SCENESTATE_BATTLE)
+		cinematX.refreshHUDOverlay ()
 		
 		cinematX.runCoroutine (func)
 	end
@@ -3392,7 +3606,12 @@ do
 	function cinematX.displayQuestState (questKey)
 		local tempState = cinematX.getQuestState (questKey)
 		
-		cinematX.drawMenuBox (30,140,740,200, 0x00000099)
+		if  cinematX.useNewUI == true  and  cinematX.canUseNewUI == true  then
+			cinematX.drawMenuBox (30,140,740,200, 0x00000099)
+		else
+			Graphics.placeSprite (1, cinematX.IMGREF_QUESTBOX, 0, 0, "", 2)	
+		end
+		
 		
 		if		tempState == 1  then
 			cinematX.printCenteredText ("QUEST ACCEPTED:", 4, 400, 200)
