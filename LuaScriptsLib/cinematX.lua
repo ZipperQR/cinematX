@@ -11,6 +11,7 @@ local cinematX = {} --Package table
 local graphX = loadSharedAPI("graphX");
 local eventu = loadSharedAPI("eventu");
 local npcconfig = loadSharedAPI("npcconfig");
+local colliders = loadSharedAPI("colliders");
 
 
 function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
@@ -56,19 +57,21 @@ do
 	cinematX.ANIMSTATE_JUMP    	 = 12
 	cinematX.ANIMSTATE_FALL    	 = 13
 	cinematX.ANIMSTATE_DEFEAT  	 = 14
-	cinematX.ANIMSTATE_GRAB 	 = 15
-	cinematX.ANIMSTATE_GRABWALK	 = 16
-	cinematX.ANIMSTATE_GRABRUN	 = 17
-	cinematX.ANIMSTATE_GRABJUMP	 = 18
-	cinematX.ANIMSTATE_GRABFALL	 = 19
-	cinematX.ANIMSTATE_ATTACK 	 = 20
-	cinematX.ANIMSTATE_ATTACK1 	 = 21
-	cinematX.ANIMSTATE_ATTACK2 	 = 22
-	cinematX.ANIMSTATE_ATTACK3 	 = 23
-	cinematX.ANIMSTATE_ATTACK4 	 = 24
-	cinematX.ANIMSTATE_ATTACK5 	 = 25
-	cinematX.ANIMSTATE_ATTACK6 	 = 26
-	cinematX.ANIMSTATE_ATTACK7 	 = 27
+	cinematX.ANIMSTATE_HURT  	 = 15
+	cinematX.ANIMSTATE_STUN 	 = 16
+	cinematX.ANIMSTATE_GRAB 	 = 17
+	cinematX.ANIMSTATE_GRABWALK	 = 18
+	cinematX.ANIMSTATE_GRABRUN	 = 19
+	cinematX.ANIMSTATE_GRABJUMP	 = 20
+	cinematX.ANIMSTATE_GRABFALL	 = 21
+	cinematX.ANIMSTATE_ATTACK 	 = 22
+	cinematX.ANIMSTATE_ATTACK1 	 = 23
+	cinematX.ANIMSTATE_ATTACK2 	 = 24
+	cinematX.ANIMSTATE_ATTACK3 	 = 25
+	cinematX.ANIMSTATE_ATTACK4 	 = 26
+	cinematX.ANIMSTATE_ATTACK5 	 = 27
+	cinematX.ANIMSTATE_ATTACK6 	 = 28
+	cinematX.ANIMSTATE_ATTACK7 	 = 29
 	
 	
 	-- Actor animation state table
@@ -103,6 +106,18 @@ do
 	
 		if ad[cinematX.ANIMSTATE_TALK] == nil  then
 			ad[cinematX.ANIMSTATE_TALK] = ad[cinematX.ANIMSTATE_IDLE];
+		end
+	
+		if ad[cinematX.ANIMSTATE_HURT] == nil  then
+			ad[cinematX.ANIMSTATE_HURT] = ad[cinematX.ANIMSTATE_IDLE];
+		end
+
+		if ad[cinematX.ANIMSTATE_DEFEAT] == nil  then
+			ad[cinematX.ANIMSTATE_DEFEAT] = ad[cinematX.ANIMSTATE_HURT];
+		end
+
+		if ad[cinematX.ANIMSTATE_STUN] == nil  then
+			ad[cinematX.ANIMSTATE_STUN] = ad[cinematX.ANIMSTATE_HURT];
 		end
 
 		if ad[cinematX.ANIMSTATE_RUN] == nil  then
@@ -193,6 +208,10 @@ do
 				index = cinematX.ANIMSTATE_JUMP;
 			elseif(ts[1] == "fall") then
 				index = cinematX.ANIMSTATE_FALL;
+			elseif(ts[1] == "hurt") then
+				index = cinematX.ANIMSTATE_HURT;
+			elseif(ts[1] == "stun") then
+				index = cinematX.ANIMSTATE_STUN;
 			elseif(ts[1] == "defeat") then
 				index = cinematX.ANIMSTATE_DEFEAT;
 			elseif(ts[1] == "attack") then
@@ -306,8 +325,14 @@ do
 		
 		thisActorObj.hpMax = 3
 		thisActorObj.hp = thisActorObj.hpMax
+		thisActorObj.hpLastFrame = thisActorObj.hp
+		thisActorObj.hitbox = colliders.getSpeedHitbox (thisActorObj.smbxObjRef)
+		thisActorObj.killOnZeroHp = false
+		thisActorObj.indefiniteKO = false
 		
-		
+		thisActorObj.stunCountdown = 0		
+		thisActorObj.koCountdown = -1		
+		thisActorObj.reviveHp = 1
 		
 		thisActorObj.justThrownCounter = 0
 		
@@ -587,7 +612,7 @@ do
 			if self:getAnimState() < cinematX.ANIMSTATE_ATTACK1 then
 
 				-- If on ground
-				if    (self.onGround == true)   then
+				if    (self.onGround == true)   then				
 					if    math.abs (self:getSpeedX()) < 1 then
 						if    cinematX.dialogSpeaker == self   then
 							self:setAnimState (self.talkAnim)
@@ -628,6 +653,19 @@ do
 						self:setAnimState (cinematX.ANIMSTATE_GRABJUMP)
 					else
 						self:setAnimState (cinematX.ANIMSTATE_JUMP)
+					end
+				end
+				
+				-- Stun overrides all other animations
+				if  self.stunCountdown > 0  then
+					if 	self.onGround == true  then
+						if 	self.koCountdown > 0  then
+							self:setAnimState (cinematX.ANIMSTATE_DEFEAT)
+						else
+							self:setAnimState (cinematX.ANIMSTATE_STUN)
+						end
+					else
+						self:setAnimState (cinematX.ANIMSTATE_HURT)
 					end
 				end
 			end
@@ -801,14 +839,7 @@ do
 			
 			cinematX.runCoroutine (cor_meleeAttack)
 		end
-		
-		
-		function NPC:harm (damage)
-			local hits = self:mem (0x148, FIELD_FLOAT)
-			self:mem (0x148, FIELD_FLOAT, hits - damage)
-		end
-		
-		
+			
 		function cor_meleeAttack ()
 			--[[
 				Motion types:
@@ -868,12 +899,69 @@ do
 			end
 		end
 		
-		
+			
 		function Actor:projectile (npcid, xOffset, yOffset, speedX, speedY)
 			local spawned = NPC.spawn (npcid, self:getCenterX() + xOffset, self:getCenterY() + yOffset,  player.section)
 			spawned.speedX = speedX
 			spawned.speedY = speedY
 			return spawned
+		end
+
+		
+		function NPC:harm (damage)
+			local hits = self:mem (0x148, FIELD_FLOAT)
+			self:mem (0x148, FIELD_FLOAT, hits - damage)
+		end
+		
+		function Actor:harm (damage, stunFrames, knockbackX, knockBackY)
+			self.hp = self.hp - damage
+			self:knockback (knockbackX or 2, knockbackY or 5, stunFrames)
+			
+			if self.hp  <=  0  then
+				self:zeroHP ()
+			end
+		end
+
+		
+		function Actor:stun (frames)
+			if  frames == 0  then
+				return
+			end
+			self.stunCountdown = frames
+		end
+		
+		function Actor:knockback (speedX, speedY, stunFrames)
+			local dirFacing = self:getDirection ()
+			
+			self:jump (speedY)
+			self:setSpeedX (speedX)
+			
+			self:setDirection (dirFacing)
+			self:stun (stunFrames)
+		end
+		
+		function Actor:zeroHP ()
+			if  self.killOnZeroHp == true  then
+				self:kill ()
+			else
+				self:ko (self.indefiniteKO, 300)
+			end
+		end
+		
+		function Actor:kill ()
+			self.smbxObjRef:kill ()
+		end
+		
+		function Actor:ko (isIndefinite, koFrames)
+			self.koCountdown = koFrames
+			self.indefiniteKO = isIndefinite
+		end
+
+		function Actor:revive (amtRestored)
+			self.koCountdown = -1
+			self.stunCountdown = -1
+			
+			self.hp = amtRestored or self.reviveHp
 		end
 	end
 	
@@ -1001,8 +1089,7 @@ do
 			self.justThrownCounter = 30
 		end
 		
-		
-		
+				
 	
 		function Actor:setSpawnX (newX)
 			self.smbxObjRef:mem(0xAC, FIELD_WORD, newX)
@@ -1157,12 +1244,19 @@ do
 		end
 		
 		
-		function Actor:jump (strength)
+		function Actor:jump (strength, playSound)
 			--if  self.smbxObjRef == player  then
+			
+			if  playSound == nil  then
+				playSound = true
+			end
 			
 			--else
 				self:setSpeedY (-1 * strength)
-				cinematX.playSFXSingle (1)	
+				
+				if  playSound == true  then
+					cinematX.playSFXSingle (1)	
+				end
 				self.framesSinceJump = 0
 				self.jumpStrength = strength
 			--end
@@ -1205,6 +1299,37 @@ do
 		end
 	
 		
+		-- Update hitbox
+		self.hitbox = colliders.getSpeedHitbox (self.smbxObjRef)
+
+		
+		-- Update HP
+		if  self.hp <= 0  and  self.hpLastFrame > 0  then
+			self:zeroHP ()
+		end
+		self.hpLastFrame = self.hp
+		
+		
+		-- Decrement stun and KO countdowns
+		self.stunCountdown = self.stunCountdown - 1
+		
+		if  self.indefiniteKO == false  then
+			self.koCountdown = self.koCountdown - 1
+		end
+		
+		if 	self.koCountdown > 0		then
+			self.stunCountdown = self.koCountdown
+		end
+		
+		
+		-- Revive from KO
+		if  self.koCountdown == 0  then
+			self.koCountdown = -1
+			
+			self:revive ()
+		end
+		
+		
 		-- Display the actor's UID variables
 		if  (cinematX.showDebugInfo == true)  then
 			printText (tostring(self:getUIDMem()) .. ", " .. self.uid, 4, self:getScreenX(), self:getScreenY()-32)
@@ -1226,6 +1351,7 @@ do
 		
 		-- Update jump signal
 		self.framesSinceJump = self.framesSinceJump + 1
+
 		
 		-- Check if underwater
 		self.isUnderwater = false
@@ -1235,7 +1361,7 @@ do
 		
 		
 		-- Decrement just thrown counter
-		self.justThrownCounter = self.justThrownCounter - 1
+		self.framesSinceJump = self.framesSinceJump + 1
 		
 		
 		-- Following behavior
@@ -1399,14 +1525,14 @@ do
 		--]]
 		
 		-- Look at player if allowed to
-		if  self.shouldFacePlayer == true   then
+		if  self.shouldFacePlayer == true  and  self.stunCountdown < 0   then
 			self:lookAtPlayer ()
 		end
 		
 		-- Say hello if player approaches
 		self.helloCooldown = self.helloCooldown - 1
 		
-		if (cinematX.currentSceneState ~= cinematX.SCENESTATE_CUTSCENE)  then
+		if (cinematX.currentSceneState ~= cinematX.SCENESTATE_CUTSCENE)  and  self.stunCountdown <= 0  then
 			if  self:distanceActorX (cinematX.playerActor) < 64  then
 				if (self.saidHello == false  and  self.helloCooldown <= 0) then
 					if  (self.helloVoice ~= "")  then
@@ -1432,6 +1558,7 @@ do
 			end
 		end
 		
+		
 		-- Walk to destination
 		if  (self.shouldWalkToDest == true)  then
 			
@@ -1452,10 +1579,15 @@ do
 		end
 		
 		-- Perform walking
-		if (self.walkSpeed ~= 0  and  (smbxObjRef == player  and  cinematX.currentSceneState ~= SCENESTATE_CUTSCENE) == false) then
+		if (self.walkSpeed ~= 0  and  (smbxObjRef == player  and  cinematX.currentSceneState ~= SCENESTATE_CUTSCENE) == false  and  self.stunCountdown <= 0) then
 			self:setDirectionFromMovement ()
 			self:setSpeedX (self.walkSpeed)
 		end
+		
+		
+		-- Update hitbox
+		self.hitbox = colliders.getSpeedHitbox (self.smbxObjRef)
+				
 		
 		-- Save state to prevent despawning
 		if  (self.shouldDespawn == false  and  self.isDespawned == false)  then
@@ -2326,7 +2458,8 @@ do
 								
 									-- Display the icon above the NPC
 								if  (v.wordBubbleIcon ~= nil)  then
-									Graphics.placeSprite (2, tempIcon, v:getX()-8, v:getY()-64, "", 2)
+									local playerDistanceAlpha  =  math.max(1 - (v:distanceActor (cinematX.playerActor))/256,  0)
+									Graphics.drawImageToScene (tempIcon, v:getX()-8, v:getY()-64, 0.3 + 0.7*playerDistanceAlpha)--math.sin(os.clock()))
 								end
 							end
 						end
