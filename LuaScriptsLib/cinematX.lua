@@ -260,6 +260,35 @@ do
 end
 
 
+--***************************************************************************************************
+--                                                                                                  *
+--              GET TYPE																		    *
+--                                                                                                  *
+--***************************************************************************************************
+local TYPE_PLAYER = 1;
+local TYPE_NPC = 2;
+local TYPE_BLOCK = 3;
+local TYPE_ANIM = 4;
+local TYPE_ACTOR = 5;
+
+local function getType (obj)
+	if (obj.TYPE ~= nil) then
+		return obj.TYPE;
+	elseif (obj.smbxObjRef ~= nil) then
+		return TYPE_ACTOR;
+	elseif (obj.powerup ~= nil) then
+		return TYPE_PLAYER;
+	elseif (obj.slippery ~= nil) then
+		return TYPE_BLOCK;
+	elseif (obj.timer ~= nil) then
+		return TYPE_ANIM;
+	elseif (obj.id ~= nil) then
+		return TYPE_NPC;
+	else
+		error("Unknown object type.", 2);
+	end
+end
+
 
 --***************************************************************************************************
 --                                                                                                  *
@@ -967,6 +996,20 @@ do
 	
 	-- Movement
 	do
+		function Actor:follow (targetObj, speed, howClose, shouldTeleport, easeDist)
+			local targetType = getType (targetObj)
+			
+			if  targetType == TYPE_ACTOR  then
+				self:followActor (targetObj, speed, howClose, shouldTeleport, easeDist)
+			elseif  targetType == TYPE_NPC  then
+				self:followNPC (targetObj, speed, howClose, shouldTeleport, easeDist)				
+			elseif  targetType == TYPE_BLOCK  then
+				self:followBlock (targetObj, speed, howClose, shouldTeleport, easeDist)			
+			else
+				return
+			end
+		end
+		
 		function Actor:followActor (targetActor, speed, howClose, shouldTeleport, easeDist)
 			self.shouldWalkToDest = true
 			self.actorToFollow = targetActor
@@ -1060,6 +1103,10 @@ do
 		end
 		
 		function Actor:dropCarried ()
+			if  self.isCarrying == false  then
+				return
+			end
+		
 			self.isCarrying = false
 			local npcUID = self.carriedNPC:mem(cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
 			
@@ -1351,7 +1398,8 @@ do
 		
 		-- Update jump signal
 		self.framesSinceJump = self.framesSinceJump + 1
-
+		Text.print (tostring (self.framesSinceJump), self:getCenterX(), self:topOffsetY (16))
+		
 		
 		-- Check if underwater
 		self.isUnderwater = false
@@ -1361,7 +1409,7 @@ do
 		
 		
 		-- Decrement just thrown counter
-		self.framesSinceJump = self.framesSinceJump + 1
+		self.justThrownCounter = self.justThrownCounter - 1
 		
 		
 		-- Following behavior
@@ -1419,7 +1467,7 @@ do
 			
 		end
 			
-		if  leaderToFollow  ~=  nil		then
+		if  leaderToFollow  ~=  nil  and  self.stunCountdown <= 0		then
 			self.walkDestX = leaderX
 			
 			-- If the actor being followed just jumped and they are above me, jump shortly after
