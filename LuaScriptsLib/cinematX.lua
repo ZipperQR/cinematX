@@ -4336,6 +4336,11 @@ do
 		return cinematX.indexedActors[cinematX.npcMessageKeyIndexes[keyStr]]  --thisIndex]
 	end
 
+	function cinematX.getActorFromNPC (npcRef)
+		local uid = npcRef:mem (cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
+		return cinematX.indexedActors[uid]
+	end
+	
 	function cinematX.getNPCIndexFromKey (keyStr)
 		local thisIndex = cinematX.npcMessageKeyIndexes[keyStr]
 		--cinematX.toConsoleLog ("GOT INDEX "..tostring(thisIndex).." FROM KEY "..keyStr)
