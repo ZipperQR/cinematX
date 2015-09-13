@@ -186,9 +186,12 @@ do
 		end
 		
 		
-		if  lastSpaceX ~= nil  then
-			graphX.boxScreen (lastSpaceX,lastSpaceY, font.charWidth,font.charHeight, 0x00990099)
-		end
+		-- Debug drawing
+		--if  lastSpaceX ~= nil  then
+			--graphX.boxScreen (lastSpaceX,lastSpaceY, font.charWidth,font.charHeight, 0x00990099)
+		--end
+		
+		
 		--windowDebug (text)
 	end
 
@@ -203,35 +206,65 @@ end
 --***************************************************************************************************
 
 do
+	textblox.BOXTYPE_NONE = 0
+	textblox.BOXTYPE_MENU = 1
+	textblox.BOXTYPE_WORDBUBBLE = 2
+	textblox.BOXTYPE_CUSTOM = 3
+	
+	textblox.BIND_SCREEN = 0
+	textblox.BIND_LEVEL = 1
+
+	textblox.SCALE_FIXED = 0
+	textblox.SCALE_AUTO = 1
+	
+	textblox.HALIGN_LEFT = 0
+	textblox.HALIGN_MID = 1
+	textblox.HALIGN_RIGHT = 2
+	
+	textblox.VALIGN_TOP = 0
+	textblox.VALIGN_MID = 1
+	textblox.VALIGN_BOTTOM = 2
+	
+	
 	TextBlock = {}
 	TextBlock.__index = TextBlock
 	
-	function TextBlock.create(x,y,w,h,textStr,bind,font,halign,valign,speed,xmargin,ymargin)
+	function TextBlock.create(x,y, textStr, properties)
 		
 		local thisTextBlock = {}							-- our new object
 		setmetatable (thisTextBlock, TextBlock)				-- make TextBlock handle lookup
 		
+		
+		-- Properties
 		thisTextBlock.x = x
 		thisTextBlock.y = y
-		thisTextBlock.width = w
-		thisTextBlock.height = h
 		thisTextBlock.text = textStr
-		thisTextBlock.filteredText = textStr
-		thisTextBlock.length = string.len(textStr)
 		
-		thisTextBlock.bind = bind or "screen"				-- "screen" or "level"
-		thisTextBlock.halign = halign or "left"  			-- "left", "mid", "right"
-		thisTextBlock.valign = valign or "top"				-- "top", "mid", "bottom"
-			
-		thisTextBlock.font = font
+		thisTextBlock.boxType = properties["boxType"] or textblox.BOXTYPE_MENU
+		thisTextBlock.boxTex = properties["boxTex"]
+		thisTextBlock.boxColor = properties["boxColor"] or 0x00AA0099 			-- transparent green
+		thisTextBlock.scaleMode = properties["scaleMode"] or textblox.SCALE_FIXED
+		thisTextBlock.width =  = properties["w"] or 200
+		thisTextBlock.height =  = properties["h"] or 200
 		
-		thisTextBlock.speed = speed or 0.5
+		thisTextBlock.bind = properties["bind"] or textblox.BIND_SCREEN
+		thisTextBlock.halign = properties["halign"] or textblox.HALIGN_LEFT
+		thisTextBlock.valign = properties["valign"] or textblox.VALIGN_TOP
+				
+		thisTextBlock.font = properties["font"] or textblox.FONT_DEFAULT
 		
-		thisTextBlock.xMargin = xmargin or 0.0
-		thisTextBlock.yMargin = ymargin or 0.0
+		thisTextBlock.speed = properties["speed"] or 0.5
+		
+		thisTextBlock.xMargin = properties["xmargin"] or 0.0
+		thisTextBlock.yMargin = properties["ymargin"] or 0.0
 
+		
+		-- Control vars
 		thisTextBlock.pauseFrames = 0
 		thisTextBlock.shakeFrames = 0
+
+		thisTextBlock.filteredText = textStr
+		thisTextBlock.length = string.len(textStr)
 		
 		thisTextBlock.lastCharCounted = nil
 		thisTextBlock.charsCounted = 0
@@ -246,9 +279,18 @@ do
 	end
 
 	
-	function TextBlock:getTextWrapped ()
-		local numCharsPerLine = math.floor((self.width)/self.font.charWidth)
-		local wrappedText = textblox.formatDialogForWrapping (self.text, numCharsPerLine)
+	function TextBlock:getCharsPerLine ()
+		local numCharsPerLine = math.floor((self.width)/(self.font.charWidth + self.font.kerning))
+		return numCharsPerLine
+	end
+	
+	
+	function TextBlock:getTextWrapped (addSlashN)
+		if  addSlashN == nil  then
+			addSlashN = false
+		end
+		
+		local wrappedText = textblox.formatDialogForWrapping (self.text, self:getCharsPerLine (), addSlashN)
 		return wrappedText
 	end
 	
@@ -263,8 +305,19 @@ do
 		textblox.drawMenuBox   (self.x - self.xMargin + shakeX,  
 								self.y - self.yMargin + shakeY,
 								self.width + 2*self.xMargin, 
-								self.height + 2*self.yMargin)
+								self.height + 2*self.yMargin,
+								self.boxColor)
 	
+	
+		-- Draw debug stuff
+		--[[
+		graphX.boxScreen   (self.x + (self:getCharsPerLine ()) * (self.font.charWidth + self.font.kerning),
+							self.y, 
+							10,
+							self.height, 
+							0x00990099)
+		--]]
+		
 	
 		-- Display text
 		local textToShow = string.sub(self:getTextWrapped (), 1, self.charsShown)
@@ -305,6 +358,8 @@ do
 		-- Clamp typewriter effect to full text length
 		if 	self.charsShown >= self:getLength ()  then
 			self.charsShown = self:getLength ()
+			
+			--windowDebug ("Chars per line: " .. self:getCharsPerLine () .. "\n\n" .. self:getTextWrapped (true))
 		end
 	
 		-- Increment typewriter effect
@@ -416,10 +471,11 @@ do
 			local framesToPause = (1/self.speed)
 			self.pauseFrames = self.pauseFrames + framesToPause
 		end
+		
 	end
 	
 	
-	function textblox.formatDialogForWrapping (text, wrapChars)
+	function textblox.formatDialogForWrapping (text, wrapChars, addSlashN)
 		
 		-- Setup
 		local newString = text
@@ -429,6 +485,7 @@ do
 		
 		local oldPos = 1
 		local newOffset = 0
+		local newOffsetDebug = 0
 		
 		local lineStart = 1
 		local charsOnLine = 0
@@ -436,9 +493,13 @@ do
 		
 		local currentSpace = 1
 		local prevSpace = 1
+		local currentSpaceVisChars  = 0
+		local prevSpaceVisChars  = 0
 		
 		local currentDash = 1
 		local prevDash = 1
+		local currentDashVisChars  = 0
+		local prevDashVisChars  = 0
 		
 		
 		while (oldPos <= strLength) do 
@@ -450,17 +511,99 @@ do
 			local thisChar = text:sub(oldPos,oldPos)
 			local nextChar = text:sub(oldPos+1, oldPos+1)
 			local continue = false
-						
+								
+			
+			-- Wrap words when necessary
+			if  charsOnLine > wrapChars  then
+			
+				
+				local firstHalf = nil
+				local secondHalf = nil
+				local breakPoint = nil
+			
+			
+				-- Add a break command + \n for debugging purposes
+				local breakStr = "<br>"
+				if  addSlashN == true  then
+					breakStr = 	"_\n" 
+								.. tostring(prevSpace-lineStart) .. "," .. tostring(currentSpace-lineStart) .. ", " .. tostring(oldPos-lineStart) 
+								.. "   " .. tostring(newOffsetDebug) .. ", " .. tostring(oldPos+newOffsetDebug) .. ", " .. tostring(oldPos+newOffsetDebug-lineStart)
+								.. "   " .. tostring(prevSpaceVisChars) .. "/" .. tostring(currentSpaceVisChars) .. ", " .. tostring(charsOnLine).. "\n\n"
+				end
+				
+			
+				-- If a line break can be inserted between words, do so
+				if  currentSpace ~= lineStart  then
+					breakPoint = currentSpace
+					
+					firstHalf = newString:sub (1, breakPoint + newOffset)
+					secondHalf = newString:sub (breakPoint + 1 + newOffset, strLength + newOffset)
+				
+					newString = firstHalf .. breakStr .. secondHalf
+					newOffset = newOffset + breakStr:len()
+					newOffsetDebug = newOffsetDebug + 4 - 1
+				
+				
+				-- Otherwise, if the word already has a dash, break the line there
+				elseif  currentDash ~= lineStart  then
+					breakPoint = currentDash
+
+					firstHalf = newString:sub (1, breakPoint + newOffset)
+					secondHalf = newString:sub (breakPoint + 1 + newOffset, strLength + newOffset)					
+					
+					newString = firstHalf .. breakStr .. secondHalf
+					newOffset = newOffset + breakStr:len()
+					newOffsetDebug = newOffsetDebug + 4
+				
+				
+				-- Otherwise, insert a dash and a break
+				else
+					breakPoint = oldPos - 3
+					
+					firstHalf = newString:sub (1, breakPoint + newOffset)
+					secondHalf = newString:sub (breakPoint + 1 + newOffset, strLength + newOffset)
+					
+					newString = firstHalf .. "-" .. breakStr .. secondHalf
+					newOffset = newOffset + 1 + breakStr:len()
+					newOffsetDebug = newOffsetDebug + 4 + 1			
+				end
+				
+				
+				-- Set up new line
+				local newLineString = text:sub(breakPoint, oldPos)
+				newLineString = newLineString:gsub ('<.*>', '')
+				
+				newLineChars = newLineString:len()
+				
+				charsOnLine = newLineChars
+				lineStart = oldPos
+				
+				currentSpace = oldPos
+				prevSpace = oldPos
+				currentDash = oldPos
+				prevDash = oldPos
+
+				currentSpaceVisChars = 0
+				prevSpaceVisChars = 0
+				currentDashVisChars = 0
+				prevDashVisChars = 0
+			end
+
 			
 			-- Store space position
 			if  thisChar == ' '  and  markupMode <= 0   then
 				prevSpace = currentSpace
 				currentSpace = oldPos
+				prevSpaceVisChars = currentSpaceVisChars
+				currentSpaceVisChars = charsOnLine
+				
 			
 			-- Store dash position
 			elseif  thisChar == '-'  and  markupMode <= 0   then
 				prevDash = currentDash
 				currentDash = oldPos
+				prevSpaceVisChars = currentDashVisChars
+				currentDashVisChars = charsOnLine
 			
 			-- Skip tags
 			elseif  thisChar == '<'		then		
@@ -482,66 +625,9 @@ do
 				markupMode = markupMode - 1
 				continue = true
 			end
-				
 			
-			-- Wrap words when necessary
-			if  charsOnLine >= wrapChars  then
 			
-				-- If a line break can be inserted between words, do so
-				if  currentSpace ~= lineStart  then
-					local firstHalf = newString:sub (1, currentSpace + newOffset)
-					local secondHalf = newString:sub (currentSpace + 1 + newOffset, strLength + newOffset)
-				
-					newString = firstHalf .. "<br>" .. secondHalf
-					newOffset = newOffset + 4
-					charsOnLine = 0
-					lineStart = oldPos
-					
-					currentSpace = oldPos
-					prevSpace = oldPos
-					currentDash = oldPos
-					prevDash = oldPos
-					
-					continue = true
-				
-				
-				-- Otherwise, if the word already has a dash, break the line there
-				elseif  currentDash ~= lineStart  then
-					local firstHalf = newString:sub (1, currentDash + newOffset)
-					local secondHalf = newString:sub (currentDash + 1 + newOffset, strLength + newOffset)					
-					
-					newString = firstHalf .. "<br>" .. secondHalf
-					newOffset = newOffset + 4
-					charsOnLine = 0
-					lineStart = oldPos
-					
-					currentSpace = oldPos
-					prevSpace = oldPos
-					currentDash = oldPos
-					prevDash = oldPos
-					
-					continue = true
-				
-				
-				-- Otherwise, insert a dash and a break
-				else
-					local firstHalf = newString:sub (1, oldPos - 1 + newOffset)
-					local secondHalf = newString:sub (oldPos + newOffset, strLength + newOffset)
-					
-					newString = firstHalf .. "-<br>" .. secondHalf
-					newOffset = newOffset + 5
-					charsOnLine = 0
-					lineStart = oldPos
-					
-					currentSpace = oldPos
-					prevSpace = oldPos
-					currentDash = oldPos
-					prevDash = oldPos
-
-					continue = true				
-				end
-			end
-
+			
 			
 			-- Count the current character				
 			if  continue == false  and  markupMode <= 0  then			
