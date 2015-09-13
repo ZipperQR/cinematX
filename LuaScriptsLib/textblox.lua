@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v1.0.0a                                                      						*
+--  v0.1.0a                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
@@ -66,9 +66,12 @@ do
 		local wrapW = wrapWidth or 9999
 		local currentLineWidth = 0
 		local charEndWidth = 0
-		local markupMode = false
+		local markupCount = 0
 		local i = 1
 		local totalShownChars = 0
+		
+		local lastSpaceX = nil
+		local lastSpaceY = nil
 		
 		
 		-- Effects
@@ -98,41 +101,45 @@ do
 			if  thisChar == '<'   then
 				
 				-- Stop processing the following text
-				markupMode = true
+				markupCount = markupCount + 1
 				
 				-- Line break
 				if  text:sub (i, i+2) == '<br'  then 
 					lineBreaks = lineBreaks + 1
 					charsOnLine = 0
-					i = i + 2
+					--i = i + 2
 
 					
 				-- Toggle shake mode
 				elseif  text:sub (i, i+7) == '<tremble'  	then
 					shakeMode = true
+					--i = i + 7
 				
 				-- Turn off shake mode
 				elseif  text:sub (i, i+8) == '</tremble'  	then
 					shakeMode = false
+					--i = i + 8
 				
 				-- Toggle wave mode
 				elseif  text:sub (i, i+4) == '<wave'  		then
 					waveMode = true
+					--i = i + 4
 				
 				-- Turn off wave mode
 				elseif  text:sub (i, i+5) == '</wave'  		then
 					waveMode = false
+					--i = i + 5
 				end
 
 
 			elseif  thisChar == ">"  then
-				markupMode = false
+				markupCount = markupCount - 1
 				continue = true
 			end
 				
 				
 			-- Display the current character				
-			if  continue == false  and  markupMode == false  then				
+			if  continue == false  and  markupCount <= 0  then				
 				
 				-- Ensure all apostrophes are displayed correctly
 				if  thisChar == "’"  or  thisChar == "‘"  then
@@ -161,6 +168,12 @@ do
 					
 					-- Finally, draw the image
 					font:drawCharImage (thisChar, xAffected, yAffected)
+				
+				
+				-- For debug purposes
+				else
+					lastSpaceX = xPos
+					lastSpaceY = yPos
 				end
 			
 				charsOnLine = charsOnLine + 1
@@ -172,6 +185,10 @@ do
 			i = i+1
 		end
 		
+		
+		if  lastSpaceX ~= nil  then
+			graphX.boxScreen (lastSpaceX,lastSpaceY, font.charWidth,font.charHeight, 0x00990099)
+		end
 		--windowDebug (text)
 	end
 
@@ -214,8 +231,11 @@ do
 		thisTextBlock.yMargin = ymargin or 0.0
 
 		thisTextBlock.pauseFrames = 0
+		thisTextBlock.shakeFrames = 0
 		
-		thisTextBlock.charsShown = 1
+		thisTextBlock.lastCharCounted = nil
+		thisTextBlock.charsCounted = 0
+		thisTextBlock.charsShown = 0
 		if (thisTextBlock.speed <= 0) then
 			thisTextBlock.charsShown = thisTextBlock.length
 		end
@@ -227,21 +247,34 @@ do
 
 	
 	function TextBlock:getTextWrapped ()
-		local numCharsPerLine = math.floor((self.width)/self.font.charWidth) + 3
+		local numCharsPerLine = math.floor((self.width)/self.font.charWidth)
 		local wrappedText = textblox.formatDialogForWrapping (self.text, numCharsPerLine)
 		return wrappedText
 	end
 	
 	
 	function TextBlock:draw ()
+		-- Get shake offset
+		local shakeX = math.random (-12, 12) * (self.shakeFrames/8)
+		local shakeY = math.random (-12, 12) * (self.shakeFrames/8)		
+		
+		
 		-- Draw box
-		textblox.drawMenuBox (self.x - self.xMargin, self.y - self.yMargin, self.width + 2*self.xMargin, self.height + 2*self.yMargin)
+		textblox.drawMenuBox   (self.x - self.xMargin + shakeX,  
+								self.y - self.yMargin + shakeY,
+								self.width + 2*self.xMargin, 
+								self.height + 2*self.yMargin)
+	
 	
 		-- Display text
 		local textToShow = string.sub(self:getTextWrapped (), 1, self.charsShown)
 		--local wrappedText = textToShow
 		
-		textblox.print (textToShow, self.x, self.y, self.font, self.width)
+		textblox.print (textToShow, 
+						self.x + shakeX, 
+						self.y + shakeY,
+						self.font,
+						self.width)
 	end
 
 
@@ -260,68 +293,270 @@ do
 	
 	
 	function TextBlock:update ()
-		self.pauseFrames = self.pauseFrames - 1
+		self:updateTiming ()
+	end
 	
+	
+	function TextBlock:updateTiming ()
+		self.pauseFrames = math.max(self.pauseFrames - 1, 0)
+		self.shakeFrames = math.max(self.shakeFrames - 1, 0)
+	
+	
+		-- Clamp typewriter effect to full text length
 		if 	self.charsShown >= self:getLength ()  then
 			self.charsShown = self:getLength ()
 		end
+	
+		-- Increment typewriter effect
+		if  (self.pauseFrames <= 0)  then
+
+			self.charsShown = self.charsShown + 1
+			
+			local text = self:getTextWrapped ()
+			
+			
+			-- Skip and process commands
+			local continueSkipping = true
+			
+			while  (continueSkipping == true)  do
+				
+				-- Get current character
+				local currentChar = text:sub (self.charsShown, self.charsShown)
+				
+				-- if it's the start of a command...
+				if  currentChar == '<'  then
+					
+					-- ...First parse the command...
+					local commandEnd = text:find ('>', self.charsShown)
+					local fullCommand = text:sub (self.charsShown, commandEnd)
+					local commandName = fullCommand:match ('%a+', 1)
+					local commandArgsPlusEnd = nil
+					local commandArgs = nil
+					local abortNow = false
+					
+					if commandName ~= nil  then
+						commandArgsPlusEnd = fullCommand:match ('%s.+>', 1)--commandName:len())						
+						--windowDebug ("Name: " .. commandName .. "\nArgs plus end: " .. tostring(commandArgsPlusEnd))
+
+					end
+					
+					if  commandArgsPlusEnd ~= nil  then						
+						commandArgs = commandArgsPlusEnd:sub (2, commandArgsPlusEnd:len() - 1)
+					end
+
+					
+					-- ...then perform behavior based on the command...
+					-- Pause:  if no arguments, assume a full second
+					if  commandName == 'pause' then
+						--windowDebug (tostring(commandArgs))
+						
+						if  commandArgs == nil then
+							commandArgs = 60
+						end
+						
+						--windowDebug (tostring(commandArgs))
+						
+						self.pauseFrames = self.pauseFrames + commandArgs
+						abortNow = true
+					
+					
+					-- change speed
+					elseif  commandName == 'speed' then
+						if  commandArgs == nil then
+							commandArgs = 0.5
+						end
+						
+						self.speed = commandArgs
+						abortNow = true
+					
+					
+					-- Play sound effect
+					elseif  commandName == 'sound' then
+						if  commandArgs ~= nil then
+							local sound = Misc.resolveFile (commandArgs)
+							
+							if sound ~= nil  then
+								Audio.playSFX (sound)
+							end
+						end
+						
+						self.pauseFrames = self.pauseFrames + commandArgs
+				
+				
+					-- Shake
+					elseif  commandName == 'shake' then
+						if  commandArgs == 'screen' or commandArgs == '0' or commandArgs == nil  then
+							earthquake(8)
+							
+						elseif  commandArgs == 'box' or commandArgs == '1'  then
+							self.shakeFrames = 8
+						end
+					
+					end					
+				
+				
+					-- ...then add the length of the command to the displayed characters to skip the command
+					if  abortNow == true  then
+						continueSkipping = false
+						self.charsShown = self.charsShown
+					end
+					
+					self.charsShown = self.charsShown + fullCommand:len()
+				
+				
+				-- Otherwise, stop processing
+				else
+					continueSkipping = false			
+				end
+			end
+			
+			
+			
+			-- Pause for X frames
+			local framesToPause = (1/self.speed)
+			self.pauseFrames = self.pauseFrames + framesToPause
+		end
+	end
+	
+	
+	function textblox.formatDialogForWrapping (text, wrapChars)
 		
-		if 	self.charsShown < self:getLength ()  and  self.pauseFrames <= 0  then
-			self.charsShown = self.charsShown + self.speed
-		end
-	end
-
-	
-	
-	function textblox.formatDialogForWrapping (str,chars)
-		local tl = str;
-		local hd = "";
-		local i = 1;
-		while (string.len(tl)>chars) do
-			local split = textblox.wrapString(tl,chars);
-			split.hd = split.hd:gsub("^%s*", "")
-			split.tl = split.tl:gsub("^%s*", "")
-			local c = chars;
-			if(i > 1) then c = (chars+1); end
-			if (string.len(split.hd) < c) then
-				split.hd = split.hd.."<br>";
+		-- Setup
+		local newString = text
+		local strLength = text:len()
+		local currentLineWidth = 0
+		local markupMode = 0
+		
+		local oldPos = 1
+		local newOffset = 0
+		
+		local lineStart = 1
+		local charsOnLine = 0
+		local totalShownChars = 0
+		
+		local currentSpace = 1
+		local prevSpace = 1
+		
+		local currentDash = 1
+		local prevDash = 1
+		
+		
+		while (oldPos <= strLength) do 
+		
+			-- Get character
+			local lastNum = math.max(1, oldPos-1)
+			
+			local lastChar = text:sub(lastNum, lastNum)
+			local thisChar = text:sub(oldPos,oldPos)
+			local nextChar = text:sub(oldPos+1, oldPos+1)
+			local continue = false
+						
+			
+			-- Store space position
+			if  thisChar == ' '  and  markupMode <= 0   then
+				prevSpace = currentSpace
+				currentSpace = oldPos
+			
+			-- Store dash position
+			elseif  thisChar == '-'  and  markupMode <= 0   then
+				prevDash = currentDash
+				currentDash = oldPos
+			
+			-- Skip tags
+			elseif  thisChar == '<'		then		
+				markupMode = markupMode + 1
+				continue = true
+				
+				-- But catch pre-existing breaks
+				if  text:sub (oldPos, oldPos+3) == '<br>'  then
+					charsOnLine = 0
+					lineStart = oldPos
+					
+					currentSpace = oldPos
+					prevSpace = oldPos
+					currentDash = oldPos
+					prevDash = oldPos
+				end
+				
+			elseif  thisChar == ">"  	then
+				markupMode = markupMode - 1
+				continue = true
 			end
-			hd = hd..split.hd;
-			tl = split.tl;
-			i = i + 1;
-		end
-		return hd..tl;
-	end
-	
-	function textblox.wrapString (str, l)
-		local head = "";
-		local tail = "";
-		local wrds = {}
-		local i = 0;
-		for j in string.gmatch(str, "%S+") do
-			wrds[i] = j;
-			i = i + 1
-		end
-		i = 0;
-		while(wrds[i] ~= nil) do
-			local newHd = head.." "..wrds[i];
-			if(string.len(newHd) <= l) then
-				head = newHd;
-				i = i + 1
-			else
-				break;
-			end
-		end
+				
+			
+			-- Wrap words when necessary
+			if  charsOnLine >= wrapChars  then
+			
+				-- If a line break can be inserted between words, do so
+				if  currentSpace ~= lineStart  then
+					local firstHalf = newString:sub (1, currentSpace + newOffset)
+					local secondHalf = newString:sub (currentSpace + 1 + newOffset, strLength + newOffset)
+				
+					newString = firstHalf .. "<br>" .. secondHalf
+					newOffset = newOffset + 4
+					charsOnLine = 0
+					lineStart = oldPos
+					
+					currentSpace = oldPos
+					prevSpace = oldPos
+					currentDash = oldPos
+					prevDash = oldPos
+					
+					continue = true
+				
+				
+				-- Otherwise, if the word already has a dash, break the line there
+				elseif  currentDash ~= lineStart  then
+					local firstHalf = newString:sub (1, currentDash + newOffset)
+					local secondHalf = newString:sub (currentDash + 1 + newOffset, strLength + newOffset)					
+					
+					newString = firstHalf .. "<br>" .. secondHalf
+					newOffset = newOffset + 4
+					charsOnLine = 0
+					lineStart = oldPos
+					
+					currentSpace = oldPos
+					prevSpace = oldPos
+					currentDash = oldPos
+					prevDash = oldPos
+					
+					continue = true
+				
+				
+				-- Otherwise, insert a dash and a break
+				else
+					local firstHalf = newString:sub (1, oldPos - 1 + newOffset)
+					local secondHalf = newString:sub (oldPos + newOffset, strLength + newOffset)
+					
+					newString = firstHalf .. "-<br>" .. secondHalf
+					newOffset = newOffset + 5
+					charsOnLine = 0
+					lineStart = oldPos
+					
+					currentSpace = oldPos
+					prevSpace = oldPos
+					currentDash = oldPos
+					prevDash = oldPos
 
-		while(wrds[i] ~= nil) do
-			tail = tail.." "..wrds[i];
-			i = i + 1
+					continue = true				
+				end
+			end
+
+			
+			-- Count the current character				
+			if  continue == false  and  markupMode <= 0  then			
+				charsOnLine = charsOnLine + 1
+				totalShownChars = totalShownChars + 1
+			end
+			
+			
+			-- Increment i
+			oldPos = oldPos+1
 		end
-      
-		return { hd = head, tl = tail };
+		
+		return newString
 	end
 end
-	
 
 
 --***************************************************************************************************
