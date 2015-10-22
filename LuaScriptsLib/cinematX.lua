@@ -1702,13 +1702,13 @@ end
 
 do
 	cinematX.overrideNPCMessages = false
-	cinematX.showDebugInfo = true --false
+	cinematX.showDebugInfo = false
 	cinematX.shouldGenerateActors = true
 	cinematX.actorCriteria = nil
 	cinematX.transitionBetweenSections = true
 	cinematX.useNewUI = true
 	cinematX.useHUDBox = false
-	cinematX.freezeDuringCutscenes = true
+	cinematX.freezeDuringCutscenes = false
 	
 	--cinematX.npcsToIgnore = {}
 	
