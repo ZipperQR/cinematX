@@ -11,6 +11,7 @@ local cinematX = {} --Package table
 local graphX = loadSharedAPI("graphX");
 local eventu = loadSharedAPI("eventu");
 local npcconfig = loadSharedAPI("npcconfig");
+local colliders = loadSharedAPI("colliders");
 
 
 function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
@@ -56,19 +57,21 @@ do
 	cinematX.ANIMSTATE_JUMP    	 = 12
 	cinematX.ANIMSTATE_FALL    	 = 13
 	cinematX.ANIMSTATE_DEFEAT  	 = 14
-	cinematX.ANIMSTATE_GRAB 	 = 15
-	cinematX.ANIMSTATE_GRABWALK	 = 16
-	cinematX.ANIMSTATE_GRABRUN	 = 17
-	cinematX.ANIMSTATE_GRABJUMP	 = 18
-	cinematX.ANIMSTATE_GRABFALL	 = 19
-	cinematX.ANIMSTATE_ATTACK 	 = 20
-	cinematX.ANIMSTATE_ATTACK1 	 = 21
-	cinematX.ANIMSTATE_ATTACK2 	 = 22
-	cinematX.ANIMSTATE_ATTACK3 	 = 23
-	cinematX.ANIMSTATE_ATTACK4 	 = 24
-	cinematX.ANIMSTATE_ATTACK5 	 = 25
-	cinematX.ANIMSTATE_ATTACK6 	 = 26
-	cinematX.ANIMSTATE_ATTACK7 	 = 27
+	cinematX.ANIMSTATE_HURT  	 = 15
+	cinematX.ANIMSTATE_STUN 	 = 16
+	cinematX.ANIMSTATE_GRAB 	 = 17
+	cinematX.ANIMSTATE_GRABWALK	 = 18
+	cinematX.ANIMSTATE_GRABRUN	 = 19
+	cinematX.ANIMSTATE_GRABJUMP	 = 20
+	cinematX.ANIMSTATE_GRABFALL	 = 21
+	cinematX.ANIMSTATE_ATTACK 	 = 22
+	cinematX.ANIMSTATE_ATTACK1 	 = 23
+	cinematX.ANIMSTATE_ATTACK2 	 = 24
+	cinematX.ANIMSTATE_ATTACK3 	 = 25
+	cinematX.ANIMSTATE_ATTACK4 	 = 26
+	cinematX.ANIMSTATE_ATTACK5 	 = 27
+	cinematX.ANIMSTATE_ATTACK6 	 = 28
+	cinematX.ANIMSTATE_ATTACK7 	 = 29
 	
 	
 	-- Actor animation state table
@@ -103,6 +106,18 @@ do
 	
 		if ad[cinematX.ANIMSTATE_TALK] == nil  then
 			ad[cinematX.ANIMSTATE_TALK] = ad[cinematX.ANIMSTATE_IDLE];
+		end
+	
+		if ad[cinematX.ANIMSTATE_HURT] == nil  then
+			ad[cinematX.ANIMSTATE_HURT] = ad[cinematX.ANIMSTATE_IDLE];
+		end
+
+		if ad[cinematX.ANIMSTATE_DEFEAT] == nil  then
+			ad[cinematX.ANIMSTATE_DEFEAT] = ad[cinematX.ANIMSTATE_HURT];
+		end
+
+		if ad[cinematX.ANIMSTATE_STUN] == nil  then
+			ad[cinematX.ANIMSTATE_STUN] = ad[cinematX.ANIMSTATE_HURT];
 		end
 
 		if ad[cinematX.ANIMSTATE_RUN] == nil  then
@@ -193,6 +208,10 @@ do
 				index = cinematX.ANIMSTATE_JUMP;
 			elseif(ts[1] == "fall") then
 				index = cinematX.ANIMSTATE_FALL;
+			elseif(ts[1] == "hurt") then
+				index = cinematX.ANIMSTATE_HURT;
+			elseif(ts[1] == "stun") then
+				index = cinematX.ANIMSTATE_STUN;
 			elseif(ts[1] == "defeat") then
 				index = cinematX.ANIMSTATE_DEFEAT;
 			elseif(ts[1] == "attack") then
@@ -240,6 +259,35 @@ do
 
 end
 
+
+--***************************************************************************************************
+--                                                                                                  *
+--              GET TYPE																		    *
+--                                                                                                  *
+--***************************************************************************************************
+local TYPE_PLAYER = 1;
+local TYPE_NPC = 2;
+local TYPE_BLOCK = 3;
+local TYPE_ANIM = 4;
+local TYPE_ACTOR = 5;
+
+local function getType (obj)
+	if (obj.TYPE ~= nil) then
+		return obj.TYPE;
+	elseif (obj.smbxObjRef ~= nil) then
+		return TYPE_ACTOR;
+	elseif (obj.powerup ~= nil) then
+		return TYPE_PLAYER;
+	elseif (obj.slippery ~= nil) then
+		return TYPE_BLOCK;
+	elseif (obj.timer ~= nil) then
+		return TYPE_ANIM;
+	elseif (obj.id ~= nil) then
+		return TYPE_NPC;
+	else
+		error("Unknown object type.", 2);
+	end
+end
 
 
 --***************************************************************************************************
@@ -306,8 +354,14 @@ do
 		
 		thisActorObj.hpMax = 3
 		thisActorObj.hp = thisActorObj.hpMax
+		thisActorObj.hpLastFrame = thisActorObj.hp
+		thisActorObj.hitbox = colliders.getSpeedHitbox (thisActorObj.smbxObjRef)
+		thisActorObj.killOnZeroHp = false
+		thisActorObj.indefiniteKO = false
 		
-		
+		thisActorObj.stunCountdown = 0		
+		thisActorObj.koCountdown = -1		
+		thisActorObj.reviveHp = 1
 		
 		thisActorObj.justThrownCounter = 0
 		
@@ -473,7 +527,7 @@ do
 		end
 	   
 		function Actor:getBottomY()
-			return self:getY() + self.smbxObjRef.height()
+			return self:getY() + self.smbxObjRef.height
 		end
 	   
 	    function Actor:getSpeedX()
@@ -539,6 +593,7 @@ do
 		end
 		
 		function Actor:overrideAnimation (animDataTable)
+			cinematX.animDataAutofill(animDataTable)
 			--windowDebug ("BEGINNING WORKS")
 			local myState = self:getAnimState ()
 			
@@ -587,7 +642,7 @@ do
 			if self:getAnimState() < cinematX.ANIMSTATE_ATTACK1 then
 
 				-- If on ground
-				if    (self.onGround == true)   then
+				if    (self.onGround == true)   then				
 					if    math.abs (self:getSpeedX()) < 1 then
 						if    cinematX.dialogSpeaker == self   then
 							self:setAnimState (self.talkAnim)
@@ -628,6 +683,19 @@ do
 						self:setAnimState (cinematX.ANIMSTATE_GRABJUMP)
 					else
 						self:setAnimState (cinematX.ANIMSTATE_JUMP)
+					end
+				end
+				
+				-- Stun overrides all other animations
+				if  self.stunCountdown > 0  then
+					if 	self.onGround == true  then
+						if 	self.koCountdown > 0  then
+							self:setAnimState (cinematX.ANIMSTATE_DEFEAT)
+						else
+							self:setAnimState (cinematX.ANIMSTATE_STUN)
+						end
+					else
+						self:setAnimState (cinematX.ANIMSTATE_HURT)
 					end
 				end
 			end
@@ -740,14 +808,14 @@ do
 	
 	
 		function Actor:closestNPC (id, maxDist)
-			local localNpcTable = NPC.get(id,player.section)
+			local localNpcTable = NPC.get (id,player.section)
 			local closestRef = nil
 			local closestDistance = maxDist or 9999
 			
 			for k,v in pairs(localNpcTable)  do
 				local distanceToThisNPC = self:distancePos (v.x, v.y)
 				
-				if  distanceToThisNPC  <  closestDistance  and  v:mem(0x64, FIELD_WORD) == 0   then
+				if  distanceToThisNPC < closestDistance  and  v:mem(0x64, FIELD_WORD) == 0  and v:mem(0x122, FIELD_WORD) == 0  then
 					closestRef = v
 					closestDistance = distanceToThisNPC
 				end
@@ -801,14 +869,7 @@ do
 			
 			cinematX.runCoroutine (cor_meleeAttack)
 		end
-		
-		
-		function NPC:harm (damage)
-			local hits = self:mem (0x148, FIELD_FLOAT)
-			self:mem (0x148, FIELD_FLOAT, hits - damage)
-		end
-		
-		
+			
 		function cor_meleeAttack ()
 			--[[
 				Motion types:
@@ -868,17 +929,88 @@ do
 			end
 		end
 		
-		
+			
 		function Actor:projectile (npcid, xOffset, yOffset, speedX, speedY)
 			local spawned = NPC.spawn (npcid, self:getCenterX() + xOffset, self:getCenterY() + yOffset,  player.section)
 			spawned.speedX = speedX
 			spawned.speedY = speedY
 			return spawned
 		end
+
+		
+		function NPC:harm (damage)
+			local hits = self:mem (0x148, FIELD_FLOAT)
+			self:mem (0x148, FIELD_FLOAT, hits - damage)
+		end
+		
+		function Actor:harm (damage, stunFrames, knockbackX, knockBackY)
+			self.hp = self.hp - damage
+			self:knockback (knockbackX or 2, knockbackY or 5, stunFrames)
+			
+			if self.hp  <=  0  then
+				self:zeroHP ()
+			end
+		end
+
+		
+		function Actor:stun (frames)
+			if  frames == 0  then
+				return
+			end
+			self.stunCountdown = frames
+		end
+		
+		function Actor:knockback (speedX, speedY, stunFrames)
+			local dirFacing = self:getDirection ()
+			
+			self:jump (speedY, false)
+			self:setSpeedX (speedX)
+			
+			self:setDirection (dirFacing)
+			self:stun (stunFrames)
+		end
+		
+		function Actor:zeroHP ()
+			if  self.killOnZeroHp == true  then
+				self:kill ()
+			else
+				self:ko (self.indefiniteKO, 300)
+			end
+		end
+		
+		function Actor:kill ()
+			self.smbxObjRef:kill ()
+		end
+		
+		function Actor:ko (isIndefinite, koFrames)
+			self.koCountdown = koFrames
+			self.indefiniteKO = isIndefinite
+		end
+
+		function Actor:revive (amtRestored)
+			self.koCountdown = -1
+			self.stunCountdown = -1
+			
+			self.hp = amtRestored or self.reviveHp
+		end
 	end
 	
 	-- Movement
 	do
+		function Actor:follow (targetObj, speed, howClose, shouldTeleport, easeDist)
+			local targetType = getType (targetObj)
+			
+			if  targetType == TYPE_ACTOR  then
+				self:followActor (targetObj, speed, howClose, shouldTeleport, easeDist)
+			elseif  targetType == TYPE_NPC  then
+				self:followNPC (targetObj, speed, howClose, shouldTeleport, easeDist)				
+			elseif  targetType == TYPE_BLOCK  then
+				self:followBlock (targetObj, speed, howClose, shouldTeleport, easeDist)			
+			else
+				return
+			end
+		end
+		
 		function Actor:followActor (targetActor, speed, howClose, shouldTeleport, easeDist)
 			self.shouldWalkToDest = true
 			self.actorToFollow = targetActor
@@ -972,6 +1104,10 @@ do
 		end
 		
 		function Actor:dropCarried ()
+			if  self.isCarrying == false  then
+				return
+			end
+		
 			self.isCarrying = false
 			local npcUID = self.carriedNPC:mem(cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
 			
@@ -1001,8 +1137,7 @@ do
 			self.justThrownCounter = 30
 		end
 		
-		
-		
+				
 	
 		function Actor:setSpawnX (newX)
 			self.smbxObjRef:mem(0xAC, FIELD_WORD, newX)
@@ -1075,16 +1210,24 @@ do
 		end
 		
 		function Actor:walk (speed)
+			if  self.stunCountdown > 0  or  self.koCountdown > 0  then
+				return
+			end
+			
 			self.shouldWalkToDest = false
 			self.walkSpeed = speed		
 		end
 
 		function Actor:walkForward (speed)
+			if  self.stunCountdown > 0  or  self.koCountdown > 0  then
+				return
+			end
+			
 			self.shouldWalkToDest = false
 			self.walkSpeed = speed * self:getDirection ()
 		end
 		
-		function Actor:walkToX (dest, speed, precision, easeDist)
+		function Actor:walkToX (dest, speed, precision, easeDist)		
 			self.shouldWalkToDest = true
 			self.walkDestX = dest
 			self.destWalkSpeed = speed
@@ -1157,12 +1300,19 @@ do
 		end
 		
 		
-		function Actor:jump (strength)
+		function Actor:jump (strength, playSound)
 			--if  self.smbxObjRef == player  then
+			
+			if  playSound == nil  then
+				playSound = true
+			end
 			
 			--else
 				self:setSpeedY (-1 * strength)
-				cinematX.playSFXSingle (1)	
+				
+				if  playSound == true  then
+					cinematX.playSFXSingle (1)	
+				end
 				self.framesSinceJump = 0
 				self.jumpStrength = strength
 			--end
@@ -1205,9 +1355,40 @@ do
 		end
 	
 		
+		-- Update hitbox
+		self.hitbox = colliders.getSpeedHitbox (self.smbxObjRef)
+
+		
+		-- Update HP
+		if  self.hp <= 0  and  self.hpLastFrame > 0  then
+			self:zeroHP ()
+		end
+		self.hpLastFrame = self.hp
+		
+		
+		-- Decrement stun and KO countdowns
+		self.stunCountdown = self.stunCountdown - 1
+		
+		if  self.indefiniteKO == false  then
+			self.koCountdown = self.koCountdown - 1
+		end
+		
+		if 	self.koCountdown > 0		then
+			self.stunCountdown = self.koCountdown
+		end
+		
+		
+		-- Revive from KO
+		if  self.koCountdown == 0  then
+			self.koCountdown = -1
+			
+			self:revive ()
+		end
+		
+		
 		-- Display the actor's UID variables
 		if  (cinematX.showDebugInfo == true)  then
-			printText (tostring(self:getUIDMem()) .. ", " .. self.uid, 4, self:getScreenX(), self:getScreenY()-32)
+			printText ("UID:" .. tostring(self:getUIDMem()) .. ", " .. self.uid, 4, self:getScreenX(), self:getScreenY()-32)
 			printText (tostring(self:getAnimFrame()), 4, self:getScreenX(), self:getScreenY()-48)
 		end
 		
@@ -1226,6 +1407,8 @@ do
 		
 		-- Update jump signal
 		self.framesSinceJump = self.framesSinceJump + 1
+		Text.print (tostring (self.framesSinceJump), self:getCenterX(), self:topOffsetY (16))
+		
 		
 		-- Check if underwater
 		self.isUnderwater = false
@@ -1239,96 +1422,98 @@ do
 		
 		
 		-- Following behavior
+		do
 			-- if following a block, NPC or another actor, set their position as the destination X
-		local leaderToFollow = nil
-		local leaderX = 0
-		local leaderY = 0
-		local leaderJumpStrength = 0
-		local leaderJumpFrames = 0
-		local leaderDirection = DIR_LEFT
-		
-		if (self.actorToFollow ~= nil) then
-			local leadActor = self.actorToFollow
+			local leaderToFollow = nil
+			local leaderX = 0
+			local leaderY = 0
+			local leaderJumpStrength = 0
+			local leaderJumpFrames = 0
+			local leaderDirection = DIR_LEFT
 			
-			leaderToFollow = leadActor
-			leaderX = leadActor:getCenterX()
-			leaderY = leadActor:getY()
-			leaderJumpStrength = leadActor.jumpStrength
-			leaderJumpFrames = leadActor.framesSinceJump
-			leaderDirection = leadActor:getDirection ()
-		end
-		
-		
-		if (self.blockToFollow ~= nil) then
-			leaderToFollow = self.blockToFollow
-			leaderX = self.blockToFollow.x
-			leaderY = self.blockToFollow.y
-			leaderJumpStrength = 8
-			leaderJumpFrames = 0
-			
-			if  (leaderY < self:getY()-64  and  self.onGround == true)  then
-				leaderJumpFrames = 13
-				leaderJumpStrength = math.min(14, (self:getY() - leaderY) * 0.25)
-
-			end
-			
-			leaderDirection = self:getDirection ()
-		end
-			
-			
-		if (self.npcToFollow ~= nil) then
-			leaderToFollow = self.npcToFollow
-			leaderX = leaderToFollow.x + (leaderToFollow.width*0.5)
-			leaderY = leaderToFollow.y + (leaderToFollow.height*0.5)
-			leaderJumpStrength = 8
-			leaderJumpFrames = 0
-			
-			if  (leaderY < self:getY()-64  and  self.onGround == true  and  self.justThrownCounter < 1)  then
-				leaderJumpFrames = 13
-				leaderJumpStrength = math.min(14, (self:getY() - leaderY) * 0.25)
-
-			end
-			
-			leaderDirection = self:getDirection ()
-			
-		end
-			
-		if  leaderToFollow  ~=  nil		then
-			self.walkDestX = leaderX
-			
-			-- If the actor being followed just jumped and they are above me, jump shortly after
-			if  (leaderJumpFrames == 13	and  
-				 self:getSpeedY() == 0				and
-				 self:getY() > leaderY+64)	then
-				 
-				self:jump (leaderJumpStrength * 0.5)			
-			
-			-- Swim
-			elseif  (self:getY() > leaderY+32) 	then
-				local tempDistAdd = math.max(1, self:distanceActor (cinematX.playerActor) / 64)
+			if (self.actorToFollow ~= nil) then
+				local leadActor = self.actorToFollow
 				
-				if      (self.isUnderwater == true)  then
-					self:jump (5 + tempDistAdd)
-					self.isResurfacing = true
-				elseif 	(self.isResurfacing == true)  then
-					self.isResurfacing = false
-					self:jump (7 + tempDistAdd)
+				leaderToFollow = leadActor
+				leaderX = leadActor:getCenterX()
+				leaderY = leadActor:getY()
+				leaderJumpStrength = leadActor.jumpStrength
+				leaderJumpFrames = leadActor.framesSinceJump
+				leaderDirection = leadActor:getDirection ()
+			end
+			
+			
+			if (self.blockToFollow ~= nil) then
+				leaderToFollow = self.blockToFollow
+				leaderX = self.blockToFollow.x
+				leaderY = self.blockToFollow.y
+				leaderJumpStrength = 8
+				leaderJumpFrames = 0
+				
+				if  (leaderY < self:getY()-64  and  self.onGround == true)  then
+					leaderJumpFrames = 13
+					leaderJumpStrength = math.min(14, (self:getY() - leaderY) * 0.25)
+
+				end
+				
+				leaderDirection = self:getDirection ()
+			end
+				
+				
+			if (cinematX.validateNPCRef(self.npcToFollow)) then
+				leaderToFollow = self.npcToFollow
+				leaderX = leaderToFollow.x + (leaderToFollow.width*0.5)
+				leaderY = leaderToFollow.y + (leaderToFollow.height*0.5)
+				leaderJumpStrength = 8
+				leaderJumpFrames = 0
+				
+				if  (leaderY < self:getY()-64  and  self.onGround == true  and  self.justThrownCounter < 1)  then
+					leaderJumpFrames = 13
+					leaderJumpStrength = math.min(14, (self:getY() - leaderY) * 0.25)
+
+				end
+				
+				leaderDirection = self:getDirection ()
+			else
+				self.npcToFollow = nil
+			end
+				
+			if  leaderToFollow  ~=  nil  and  self.stunCountdown <= 0		then
+				self.walkDestX = leaderX
+				
+				-- If the actor being followed just jumped and they are above me, jump shortly after
+				if  (leaderJumpFrames == 13	and  
+					 self:getSpeedY() == 0				and
+					 self:getY() > leaderY+64)	then
+					 
+					self:jump (leaderJumpStrength * 0.5)			
+				
+				-- Swim
+				elseif  (self:getY() > leaderY+32) 	then
+					local tempDistAdd = math.max(1, self:distanceActor (cinematX.playerActor) / 64)
+					
+					if      (self.isUnderwater == true)  then
+						self:jump (5 + tempDistAdd)
+						self.isResurfacing = true
+					elseif 	(self.isResurfacing == true)  then
+						self.isResurfacing = false
+						self:jump (7 + tempDistAdd)
+					end
+				end
+				
+				
+				-- Teleport to the actor's position if too far away
+				if  (self:distancePos(leaderX,leaderY) > 350  and  self.shouldTeleportToTarget == true)   then
+					
+					self:teleportToPosition (leaderX - self.distanceToFollow * leaderDirection,
+											 leaderY - 32)
 				end
 			end
-			
-			
-			-- Teleport to the actor's position if too far away
-			if  (self:distancePos(leaderX,leaderY) > 350  and  self.shouldTeleportToTarget == true)   then
-				
-				self:teleportToPosition (leaderX - self.distanceToFollow * leaderDirection,
-										 leaderY - 32)
-			end
 		end
-		
 	
 		
 		-- Control carrying
-		if  self.carriedNPC ~= nil		then
+		if  cinematX.validateNPCRef(self.carriedNPC)  then
 		
 			-- If the carried NPC is stolen by the player, either prevent it or stop carrying
 			local playerHeldIndex = player:mem(0x154, FIELD_WORD)
@@ -1348,11 +1533,11 @@ do
 				
 			-- Position the carried NPC above/in front of the actor
 			local carryX = self:getX() + 24*dirSign (self:getDirection ())
-			local carryY = self:getY() - 4
+			local carryY = self:getBottomY() - 36
 			
 			if  self.carryStyle == 1  then
 				carryX = self:getX()
-				carryY = self:getY()-32
+				carryY = self:getY()-28
 			end
 			
 			if  self.carriedNPC ~= nil  then
@@ -1366,6 +1551,8 @@ do
 				self.carriedNPC.speedY = 0
 				
 			end
+		else
+			self.carriedNPC = nil
 		end
 		
 		
@@ -1399,14 +1586,14 @@ do
 		--]]
 		
 		-- Look at player if allowed to
-		if  self.shouldFacePlayer == true   then
+		if  self.shouldFacePlayer == true  and  self.stunCountdown < 0   then
 			self:lookAtPlayer ()
 		end
 		
 		-- Say hello if player approaches
 		self.helloCooldown = self.helloCooldown - 1
 		
-		if (cinematX.currentSceneState ~= cinematX.SCENESTATE_CUTSCENE)  then
+		if (cinematX.currentSceneState ~= cinematX.SCENESTATE_CUTSCENE)  and  self.stunCountdown <= 0  then
 			if  self:distanceActorX (cinematX.playerActor) < 64  then
 				if (self.saidHello == false  and  self.helloCooldown <= 0) then
 					if  (self.helloVoice ~= "")  then
@@ -1432,6 +1619,7 @@ do
 			end
 		end
 		
+		
 		-- Walk to destination
 		if  (self.shouldWalkToDest == true)  then
 			
@@ -1452,10 +1640,21 @@ do
 		end
 		
 		-- Perform walking
-		if (self.walkSpeed ~= 0  and  (smbxObjRef == player  and  cinematX.currentSceneState ~= SCENESTATE_CUTSCENE) == false) then
+		if (self.walkSpeed ~= 0  and  (smbxObjRef == player  and  cinematX.currentSceneState ~= SCENESTATE_CUTSCENE) == false  and  self.stunCountdown <= 0  and  self.koCountdown <= 0) then
 			self:setDirectionFromMovement ()
 			self:setSpeedX (self.walkSpeed)
 		end
+		
+		
+		-- Stop movement if KO'd or stunned
+		if  ((self.stunCountdown > 0  or  self.koCountdown > 0)  and  self.onGround == true)   then
+			self:setSpeedX(0)
+		end
+		
+		
+		-- Update hitbox
+		self.hitbox = colliders.getSpeedHitbox (self.smbxObjRef)
+				
 		
 		-- Save state to prevent despawning
 		if  (self.shouldDespawn == false  and  self.isDespawned == false)  then
@@ -1568,6 +1767,9 @@ do
 		-- Prevent this function from being called twice
 		if  (cinematX.initCalledYet == true)  then  return  end
 	
+		cinematX.playerActor = Actor.create(player, "Player")
+
+	
 		-- Call all of the sub init functions	
 		cinematX.initTiming ()
 		cinematX.initHUD ()
@@ -1631,7 +1833,6 @@ do
 	end
 	
 	
-	cinematX.playerActor = Actor.create(player, "Player")
 	cinematX.playerHidden = false
 	
 	cinematX.actorCount = 0
@@ -2060,7 +2261,7 @@ do
 	
 	
 	-- Swap this for the location to store and read the NPC unique ID. 0x08 appears unused, but this can be changed to any unused word.
-	cinematX.ID_MEM =  0x08
+	cinematX.ID_MEM =  0x76
 	cinematX.ID_MEM_FIELD =  FIELD_WORD
 	
 	function cinematX.indexActors (onlyIndexNew)
@@ -2243,6 +2444,7 @@ do
 		for k,v in pairs (cinematX.indexedActors) do
 			if  (v ~= nil)  then
 				if (v.smbxObjRef == nil) then
+					windowDebug ("ERROR: NPC DESTROYED")
 					cinematX.toConsoleLog ("ERROR: NPC DESTROYED")
 					v = nil
 				else
@@ -2326,7 +2528,8 @@ do
 								
 									-- Display the icon above the NPC
 								if  (v.wordBubbleIcon ~= nil)  then
-									Graphics.placeSprite (2, tempIcon, v:getX()-8, v:getY()-64, "", 2)
+									local playerDistanceAlpha  =  math.max(1 - (v:distanceActor (cinematX.playerActor))/256,  0)
+									Graphics.drawImageToScene (tempIcon, v:getX()-8, v:getY()-64, 0.3 + 0.7*playerDistanceAlpha)--math.sin(os.clock()))
 								end
 							end
 						end
@@ -4146,6 +4349,31 @@ end
 --***************************************************************************************************
 
 do	
+	function cinematX.validateNPCRef (ref)
+		if  ref == nil  then
+			return false
+		end
+		
+		if  ref.isValid == false  then
+			return false
+		end		
+		
+		if  ref.id == nil  then
+			return false
+		end		
+		
+		if  ref.id == -1  then
+			return false
+		end		
+			
+		if  ref:mem (0x122, FIELD_WORD) ~= 0  then
+			return false
+		end
+			
+		return true
+	end
+
+
 	function cinematX.getNPCFromKey (keyStr)
 		return cinematX.getActorFromKey (keyStr).smbxObjRef
 	end
@@ -4155,6 +4383,11 @@ do
 		return cinematX.indexedActors[cinematX.npcMessageKeyIndexes[keyStr]]  --thisIndex]
 	end
 
+	function cinematX.getActorFromNPC (npcRef)
+		local uid = npcRef:mem (cinematX.ID_MEM, cinematX.ID_MEM_FIELD)
+		return cinematX.indexedActors[uid]
+	end
+	
 	function cinematX.getNPCIndexFromKey (keyStr)
 		local thisIndex = cinematX.npcMessageKeyIndexes[keyStr]
 		--cinematX.toConsoleLog ("GOT INDEX "..tostring(thisIndex).." FROM KEY "..keyStr)
