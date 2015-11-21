@@ -3886,7 +3886,7 @@ do
 			end
 
 			if  properties["autoEnd"] ~= nil  then
-				cinematX.setDialogInputWait (not properties["canSkip"])
+				cinematX.setDialogInputWait (not properties["autoEnd"])
 			end
 
 			if  properties["textSpeed"] ~= nil  then
@@ -4099,7 +4099,7 @@ do
 			Text.showMessageBox (text)
 		
 		elseif  boxType == cinematX.BOXTYPE_TEXTBLOX	then  
-			Textblox.create ()
+			--Textblox.create ()
 		
 		end
 	end
