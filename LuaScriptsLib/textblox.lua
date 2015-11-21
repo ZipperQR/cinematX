@@ -30,18 +30,49 @@ local textBlockRegister = {}
 --***************************************************************************************************
 
 do
+	textblox.FONTTYPE_DEFAULT = 0
+	textblox.FONTTYPE_SPRITE = 1
+	textblox.FONTTYPE_TTF = 2   --NOT SUPPORTED YET
+
+
 	Font = {}
 	Font.__index = Font
 
-	function Font.create (imagePath, charWidth, charHeight, kerning)
+	function Font.create (fontType, properties)
 		local thisFont = {}
 		setmetatable (thisFont, Font)
 		
-		thisFont.imageRef = Graphics.loadImage (Misc.resolveFile(imagePath))
-		thisFont.charWidth = charWidth
-		thisFont.charHeight = charHeight
-		thisFont.kerning = kerning
+		thisFont.fontType = fontType
 		
+		thisFont.imagePath = ""
+		thisFont.imageRef = nil
+			
+		thisFont.charWidth = 16
+		thisFont.charHeight = 20
+		thisFont.kerning = 0
+		
+		thisFont.fontIndex = 4
+		
+		
+		-- Default font
+		if  fontType == textblox.FONTTYPE_SPRITE  then
+			thisFont.fontIndex = properties
+		end
+		
+		-- Sprite font
+		if  fontType == textblox.FONTTYPE_SPRITE  then
+			if  properties["image"] ~= nil  then
+				thisFont.imageRef = properties["image"]
+			else
+				thisFont.imagePath = properties["imagePath"]  or  ""
+				thisFont.imageRef = Graphics.loadImage (Misc.resolveFile(thisFont.imagePath))
+			end
+			
+			thisFont.charWidth = properties["charWidth"]  or  16
+			thisFont.charHeight = properties["charHeight"]  or  16
+			thisFont.kerning = properties["kerning"]  or  1
+		end
+			
 		return thisFont
 	end	
 
@@ -54,8 +85,13 @@ do
 		local h = self.charHeight
 		local sourceX = (index%16) * w
 		local sourceY = math.floor(index/16) * h
-				
-		Graphics.drawImage (self.imageRef, x, y, sourceX, sourceY, w, h, alpha)
+		
+		-- Draw character based on font type
+		if  self.fontType == textblox.FONTTYPE_DEFAULT  then		
+			Text.print (character, self.fontIndex, x, y)
+		elseif  self.fontType == textblox.FONTTYPE_SPRITE  then		
+			Graphics.drawImageWP (self.imageRef, x, y, sourceX, sourceY, w, h, alpha, 3.495)
+		end		
 	end
 	
 
@@ -86,6 +122,8 @@ do
 		local lastSpaceX = nil
 		local lastSpaceY = nil
 		
+		local topmostY = 10000
+		local leftmostX = 10000
 		
 		-- Effects
 		local shakeMode = false
@@ -173,6 +211,14 @@ do
 				yPos = y + (lineBreaks*font.charHeight)	- ((allLineBreaks+1)*font.charHeight*0.5)
 			end
 			
+			
+			-- Get top left coords
+			if  yPos < topmostY  then
+				topmostY = yPos
+			end
+			if  xPos < leftmostX  then
+				leftmostX = xPos
+			end
 			
 			
 			-- Process inline commands
@@ -265,6 +311,7 @@ do
 			i = i+1
 		end
 		
+		--Text.print (tostring(totalShownChars), 4, leftmostX, topmostY-30)
 		--windowDebug ("W: " .. tostring(totalWidth) .. ",  H: " .. tostring(totalHeight))
 		return totalWidth, totalHeight
 	end
@@ -508,7 +555,12 @@ do
 															self.textAlpha)
 	end
 
-
+	
+	function TextBlock:resetText (textStr)
+		self:setText(textStr)
+		self.charsShown = 0
+	end
+	
 	function TextBlock:setText (textStr)
 		text = textStr
 	end
@@ -521,6 +573,20 @@ do
 		return string.len (self.textFiltered)
 	end
 
+	
+	function TextBlock:isFinished ()
+		return 	self.charsShown >= self:getLength ()
+	end
+	
+	function TextBlock:finish ()
+		self.pauseFrames = -1
+		self.shakeFrames = -1
+		self.charsShown = self:getLength()
+	end
+	
+	function TextBlock:delete ()
+		
+	end
 	
 	
 	function TextBlock:update ()

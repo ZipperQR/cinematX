@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	cinematX.lua																		*
---  v0.0.8d                                                      						*
+--  v0.0.8i                                                      						*
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
 --	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
 --                                                                                      *
@@ -9,9 +9,12 @@
 
 local cinematX = {} --Package table
 local graphX = loadSharedAPI("graphX");
+local textblox = loadSharedAPI("textblox");
 local eventu = loadSharedAPI("eventu");
 local npcconfig = loadSharedAPI("npcconfig");
 local colliders = loadSharedAPI("colliders");
+local inputs = loadSharedAPI("inputs");
+
 
 
 function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
@@ -42,36 +45,41 @@ do
 	cinematX.midpointReached = false
 	
 	-- Animation states enum
-	cinematX.ANIMSTATE_NUMFRAMES =  0
-	cinematX.ANIMSTATE_IDLE      =  1
-	cinematX.ANIMSTATE_TALK      =  2
-	cinematX.ANIMSTATE_TALK1   	 =  3
-	cinematX.ANIMSTATE_TALK2   	 =  4
-	cinematX.ANIMSTATE_TALK3   	 =  5
-	cinematX.ANIMSTATE_TALK4   	 =  6
-	cinematX.ANIMSTATE_TALK5   	 =  7
-	cinematX.ANIMSTATE_TALK6   	 =  8
-	cinematX.ANIMSTATE_TALK7   	 =  9
-	cinematX.ANIMSTATE_WALK    	 = 10
-	cinematX.ANIMSTATE_RUN    	 = 11
-	cinematX.ANIMSTATE_JUMP    	 = 12
-	cinematX.ANIMSTATE_FALL    	 = 13
-	cinematX.ANIMSTATE_DEFEAT  	 = 14
-	cinematX.ANIMSTATE_HURT  	 = 15
-	cinematX.ANIMSTATE_STUN 	 = 16
-	cinematX.ANIMSTATE_GRAB 	 = 17
-	cinematX.ANIMSTATE_GRABWALK	 = 18
-	cinematX.ANIMSTATE_GRABRUN	 = 19
-	cinematX.ANIMSTATE_GRABJUMP	 = 20
-	cinematX.ANIMSTATE_GRABFALL	 = 21
-	cinematX.ANIMSTATE_ATTACK 	 = 22
-	cinematX.ANIMSTATE_ATTACK1 	 = 23
-	cinematX.ANIMSTATE_ATTACK2 	 = 24
-	cinematX.ANIMSTATE_ATTACK3 	 = 25
-	cinematX.ANIMSTATE_ATTACK4 	 = 26
-	cinematX.ANIMSTATE_ATTACK5 	 = 27
-	cinematX.ANIMSTATE_ATTACK6 	 = 28
-	cinematX.ANIMSTATE_ATTACK7 	 = 29
+	local i = 0;
+	
+	cinematX.ANIMSTATE_NUMFRAMES =  i; i=i+1;
+	cinematX.ANIMSTATE_BLANK 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_IDLE      =  i; i=i+1;
+	cinematX.ANIMSTATE_TALK      =  i; i=i+1;
+	cinematX.ANIMSTATE_TALK1   	 =  i; i=i+1;
+	cinematX.ANIMSTATE_TALK2   	 =  i; i=i+1;
+	cinematX.ANIMSTATE_TALK3   	 =  i; i=i+1;
+	cinematX.ANIMSTATE_TALK4   	 =  i; i=i+1;
+	cinematX.ANIMSTATE_TALK5   	 =  i; i=i+1;
+	cinematX.ANIMSTATE_TALK6   	 =  i; i=i+1;
+	cinematX.ANIMSTATE_TALK7   	 =  i; i=i+1;
+	cinematX.ANIMSTATE_WALK    	 =  i; i=i+1;
+	cinematX.ANIMSTATE_RUN    	 =  i; i=i+1;
+	cinematX.ANIMSTATE_JUMP    	 =  i; i=i+1;
+	cinematX.ANIMSTATE_FALL    	 =  i; i=i+1;
+	cinematX.ANIMSTATE_DEFEAT  	 =  i; i=i+1;
+	cinematX.ANIMSTATE_HURT  	 =  i; i=i+1;
+	cinematX.ANIMSTATE_STUN 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_GRAB 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_GRABWALK	 =  i; i=i+1;
+	cinematX.ANIMSTATE_GRABRUN	 =  i; i=i+1;
+	cinematX.ANIMSTATE_GRABJUMP	 =  i; i=i+1;
+	cinematX.ANIMSTATE_GRABFALL	 =  i; i=i+1;
+	cinematX.ANIMSTATE_ATTACK 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_ATTACK1 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_ATTACK2 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_ATTACK3 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_ATTACK4 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_ATTACK5 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_ATTACK6 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_ATTACK7 	 =  i; i=i+1;
+	cinematX.ANIMSTATE_CLIMB 	 =  i; i=i+1;  -- 31
+	cinematX.ANIMSTATE_TOPPRESET =  i; i=i+1;
 	
 	
 	-- Actor animation state table
@@ -148,6 +156,10 @@ do
 			ad[cinematX.ANIMSTATE_GRABFALL] = ad[cinematX.ANIMSTATE_FALL];
 		end		
 		
+		if ad[cinematX.ANIMSTATE_CLIMB] == nil  then
+			ad[cinematX.ANIMSTATE_CLIMB] = ad[cinematX.ANIMSTATE_JUMP];
+		end		
+		
 		return ad;
 	end
 	 
@@ -208,6 +220,8 @@ do
 				index = cinematX.ANIMSTATE_JUMP;
 			elseif(ts[1] == "fall") then
 				index = cinematX.ANIMSTATE_FALL;
+			elseif(ts[1] == "climb") then
+				index = cinematX.ANIMSTATE_CLIMB;
 			elseif(ts[1] == "hurt") then
 				index = cinematX.ANIMSTATE_HURT;
 			elseif(ts[1] == "stun") then
@@ -336,7 +350,17 @@ do
 
 		thisActorObj.isUnderwater = false
 		thisActorObj.isResurfacing = false
+		thisActorObj.isClimbing = false
 
+		
+		thisActorObj.extraSprites = {}
+		thisActorObj.extraSpriteAnim = {}
+		thisActorObj.extraSpriteProps = {}
+		thisActorObj.extraSpriteProps["speed"] = 1
+		thisActorObj.extraSpriteProps["xOffset"] = -2
+		thisActorObj.extraSpriteProps["yOffset"] = 0
+		thisActorObj.extraSpriteFrame = -1
+		thisActorObj.extraSpriteCounter = 0
 
 		thisActorObj.helloVoice = ""
 		thisActorObj.goodbyeVoice = ""
@@ -355,7 +379,13 @@ do
 		thisActorObj.hpMax = 3
 		thisActorObj.hp = thisActorObj.hpMax
 		thisActorObj.hpLastFrame = thisActorObj.hp
-		thisActorObj.hitbox = colliders.getSpeedHitbox (thisActorObj.smbxObjRef)
+		
+		thisActorObj.isHidden = false
+		thisActorObj.actorCollisionOn = true
+		thisActorObj.hitbox = nil
+		if  thisActorObj.smbxClass ~= "Player"  then
+			thisActorObj.hitbox = colliders.getSpeedHitbox (thisActorObj.smbxObjRef)
+		end		
 		thisActorObj.killOnZeroHp = false
 		thisActorObj.indefiniteKO = false
 		
@@ -387,6 +417,7 @@ do
 		thisActorObj.messageString = ""
 		thisActorObj.nameString = ""
 		thisActorObj.talkTypeString = ""
+		thisActorObj.altSubString = ""
 		thisActorObj.wordBubbleIcon = nil
 		thisActorObj.messageIsNew = true
 
@@ -566,6 +597,30 @@ do
 	
 	-- Animation
 	do			
+		function Actor:setExtraSprites (filename, rows, dirSplit)
+			if  Misc.resolveFile(filename) ~= nil  and  rows ~= nil  and  dirSplit ~= nil  then	
+				local file = Graphics.loadImage (filename)
+				self.extraSprites["file"] = file
+				
+				self.extraSprites["cols"] = 2
+				if  dirSplit == false  then
+					self.extraSprites["cols"] = 1
+				end				
+				self.extraSprites["rows"] = rows
+				
+				local pix = {}
+				local w = 1
+				local h = 1
+				pix,w,h = Graphics.getPixelData (file)
+
+				self.extraSprites["w"] = w
+				self.extraSprites["h"] = h
+				self.extraSprites["loaded"] = true
+			else
+				windowDebug ("Failed to set extra sprites for Actor:"..self.name)
+			end
+		end
+		
 		function Actor:getAnimFrame ()
 			if  (self.smbxObjRef == nil)  then  
 				return nil;			
@@ -586,6 +641,13 @@ do
 	
 		function Actor:setAnimState (state)
 		   self.animState = state
+		end
+
+		function Actor:setTalkAnimStates (closeIdle, farIdle, talk)
+		   self.farIdleAnim = farIdle
+		   self.closeIdleAnim = closeIdle
+		   self.talkAnim = talk
+		   self:setAnimState(farIdle)
 		end
 		
 		function Actor:getAnimState ()
@@ -639,7 +701,10 @@ do
 		function Actor:setAnimStateByMovement ()
 
 			-- Don't disrupt unique animations
-			if self:getAnimState() < cinematX.ANIMSTATE_ATTACK1 then
+			if self:getAnimState() < cinematX.ANIMSTATE_ATTACK1  
+			or self:getAnimState() == self.talkAnim 
+			or self:getAnimState() == self.farIdleAnim 
+			or self:getAnimState() == self.closeIdleAnim  then
 
 				-- If on ground
 				if    (self.onGround == true)   then				
@@ -1343,17 +1408,62 @@ do
 		-- Skip update if the corresponding NPC/Player is destroyed
 		local skipUpdate = false
 		
-		if     (self.smbxObjRef == nil  or  self.smbxObjRef == 0  or  self.smbxObjRef == -1)  then  
-			skipUpdate = true
-		elseif (self.smbxObjRef:mem (0x122, FIELD_WORD) > 0   or   self:UIDCheck () == false  or self.smbxObjRef.id == 0)  then
-			skipUpdate = true
-		end	
+		
+		if  self.smbxClass == "Player"  then
+			if  self.smbxObjRef.isValid == false  then
+				skipUpdate = true
+			end
+		else
+			if     (self.smbxObjRef == nil  or  self.smbxObjRef == 0  or  self.smbxObjRef == -1)  then  
+				skipUpdate = true
+			elseif (self.smbxObjRef:mem (0x122, FIELD_WORD) > 0   or   self:UIDCheck () == false  or self.smbxObjRef.id == 0)  then
+				skipUpdate = true
+			end
+		end
 	
 		if  (skipUpdate == true)  then
 			self.isDead = true
 			return;
 		end
 	
+	
+		-- Update hidden state and collision toggle (with other actors)
+		if  self.isHidden == true  then
+			if  self.smbxClass == "Player"  then
+				--self:setMem (0x13E, FIELD_WORD, 8)
+				self:setMem (0x140, FIELD_WORD, 1)
+				self:setMem (0x142, FIELD_WORD, 0)
+			else
+			
+			end
+		end
+		
+		if  self.actorCollisionOn == false  then
+			if  self.smbxClass == "Player"  then
+				
+				local startAdr = 0x130
+				
+				for i=0,100,1 do
+					local memVal = self:getMem (startAdr+2*i, FIELD_WORD)
+				
+					if  math.abs(memVal) > 10  then
+						memVal = memVal % 10
+					end
+				
+					Text.print (intToHexString (startAdr+2*i)..": "..tostring(string.format("%.2f", memVal)), 3, 8 + 210*(math.floor(i/16)), 100 + 16*(i%16))
+				end
+				
+				self:setMem (0x13C, FIELD_WORD, 0)
+				self:setMem (0x13E, FIELD_WORD, 0)
+				--self:setMem (0x138, FIELD_FLOAT, 0)
+				--self:setMem (0x132, FIELD_WORD, 100)
+				--self:setMem (0xD8, FIELD_DFLOAT, 8)
+				--self:setMem (0x142, FIELD_WORD, 2)				
+			else
+			
+			end
+		end
+		
 		
 		-- Update hitbox
 		self.hitbox = colliders.getSpeedHitbox (self.smbxObjRef)
@@ -1505,7 +1615,15 @@ do
 				-- Teleport to the actor's position if too far away
 				if  (self:distancePos(leaderX,leaderY) > 350  and  self.shouldTeleportToTarget == true)   then
 					
-					self:teleportToPosition (leaderX - self.distanceToFollow * leaderDirection,
+					local telePosX = leaderX - self.distanceToFollow * leaderDirection
+					local telePosY = leaderY - 32
+					
+					if  true  then
+						telePosX = leaderX
+						telePosY = leaderY
+					end
+					
+					self:teleportToPosition (telePosX,
 											 leaderY - 32)
 				end
 			end
@@ -1656,6 +1774,27 @@ do
 		self.hitbox = colliders.getSpeedHitbox (self.smbxObjRef)
 				
 		
+		-- Update extra sprites
+		if  self.extraSprites["loaded"] == true  and  self.extraSpriteAnim ~= nil  and  next(self.extraSpriteAnim) ~= nil  then
+			
+			local extraAnimLength = #self.extraSpriteAnim
+						
+			self.extraSpriteFrame = (self.extraSpriteFrame + self.extraSpriteProps["speed"]*0.2) % extraAnimLength
+			
+			local extraIndex = math.floor(self.extraSpriteFrame) + 1
+			local extraCol = 1
+			
+			local extraW = self.extraSprites["w"] / self.extraSprites["cols"]
+			local extraH = self.extraSprites["h"] / self.extraSprites["rows"]
+			
+			if  self.extraSprites["cols"] == 2  and  self:getDirection() == DIR_RIGHT  then
+				extraCol = 2
+			end
+			
+			Graphics.drawImageToScene (self.extraSprites["file"], self:getCenterX() - 0.5*extraW + self.extraSpriteProps["xOffset"], self:getCenterY() - 0.5*extraH + self.extraSpriteProps["yOffset"], (extraCol-1)*extraW, self.extraSpriteAnim[extraIndex]*extraH, extraW, extraH)
+		end
+		
+		
 		-- Save state to prevent despawning
 		if  (self.shouldDespawn == false  and  self.isDespawned == false)  then
 			self:setSpawnToCurrent () 
@@ -1669,6 +1808,63 @@ do
 				isInteractive = false
 			end
 		end
+	end
+	
+	
+	
+	function cinematX.spawnPlayerActors (amount, chars, powerups)
+		
+		local originalTable = Player.get ()
+		local originalCount = mem (0x00B2595E, FIELD_WORD)
+		
+		
+		-- Spawn them
+		Misc.cheatBuffer("superbdemo128")
+			
+		mem (0x00B2595E, FIELD_WORD, amount)	
+		
+		
+		-- Remove the bomb anim and sound
+		local bombAnim = Animation.getIntersecting(player.x-32, player.y-32, player.x+32, player.y+32)[1]
+		if  bombAnim ~= nil  then
+			bombAnim.y = bombAnim.y + 10000
+		end
+		
+		Audio.clearSFXBuffer()
+		
+		
+		-- Get the table of new actors
+		local newTable = {}
+		
+		for  k,v in pairs(Player.get())  do
+			if  v ~= player  then
+				local newActor = Actor.create (v, "Player")
+				v.speedX = 0
+				v.speedY = 0
+				v.x = player.x - 56*(k-1)
+				v.y = player.y
+			
+				-- Assign character types
+				if  chars ~= nil  then
+					if chars[k-1] ~= nil  then
+						v.character = chars[k-1]
+					end
+				end
+			
+				-- Assign powerups
+				if  powerups ~= nil  then
+					if powerups[k-1] ~= nil  then
+						v.powerup = powerups[k-1]
+					end
+				end
+			
+				-- Add the actor to the new table
+				newTable[k-1] = newActor
+				--v.character = chars[ k ]
+			end
+		end
+		
+		return newTable
 	end
 	
 end
@@ -1701,16 +1897,18 @@ end
 --***************************************************************************************************
 
 do
-	cinematX.overrideNPCMessages = false
+	cinematX.overrideNPCMessages = true
 	cinematX.showDebugInfo = false
 	cinematX.shouldGenerateActors = true
 	cinematX.actorCriteria = nil
 	cinematX.transitionBetweenSections = true
 	cinematX.useNewUI = true
 	cinematX.useHUDBox = false
-	cinematX.freezeDuringCutscenes = false
+	cinematX.textbloxSubtitle = true
+	cinematX.freezeDuringCutscenes = true
 	
 	--cinematX.npcsToIgnore = {}
+	
 	
 	function cinematX.config (toggleOverrideMsg, showDebug, useHUDBox, useTransitions, oglUI, sceneFreeze)
 		
@@ -1734,7 +1932,6 @@ do
 			sceneFreeze = true
 		end
 		
-
 	
 		-- Assign values
 		cinematX.overrideNPCMessages = toggleOverrideMsg
@@ -1743,6 +1940,44 @@ do
 		cinematX.transitionBetweenSections = useTransitions
 		cinematX.useNewUI = oglUI
 		cinematX.freezeDuringCutscenes = sceneFreeze
+	end
+	
+	
+	function cinematX.configExt (settings)
+		if  settings ~= nil  then
+			
+			if  settings["overrideNpcText"] ~= nil  then
+				cinematX.overrideNPCMessages = settings["overrideNpcText"]
+			end
+			
+			if  settings["debug"] ~= nil  then
+				cinematX.showDebugInfo = settings["debug"]
+			end
+			
+			if  settings["hudBox"] ~= nil  then
+				cinematX.useHUDBox = settings["hudBox"]
+			end
+			
+			if  settings["sectionTransitions"] ~= nil  then
+				cinematX.useHUDBox = settings["sectionTransitions"]
+			end
+			
+			if  settings["imageUi"] ~= nil  then
+				cinematX.useNewUI = not settings["imageUi"]
+			end
+			
+			if  settings["cutsceneFreeze"] ~= nil  then
+				cinematX.freezeDuringCutscenes = settings["cutsceneFreeze"]
+			end
+			
+			if  settings["noActors"] ~= nil  then
+				cinematX.shouldGenerateActors = not settings["noActors"]
+			end
+			
+			if	settings["textbloxSub"] ~= nil  then
+				cinematX.textbloxSubtitle = settings["textbloxSub"]
+			end
+		end
 	end
 end
 
@@ -1760,6 +1995,7 @@ do
 	cinematX.delayedInitSectionNum = -1
 	
 	cinematX.initCalledYet = false
+	
 	
 	
 	
@@ -1849,6 +2085,10 @@ do
 	
 	cinematX.screenTintColor = 0xFFFFFF00
 	
+	cinematX.letterboxAlphaMax = 0.9
+	cinematX.letterboxAlphaMult = 0
+	cinematX.letterboxAlphaRate = 0.1
+	
 	cinematX.screenTransitionAmt = 0
 	cinematX.screenTransitionTime = 0.5
 
@@ -1916,6 +2156,42 @@ do
 		
 		-- Does the player have to press a key to continue?
 		cinematX.dialogEndWithInput = true
+
+		
+	
+		
+		-- Textblox subtitle
+		cinematX.IMGNAME_FONT1	 =	cinematX.getImagePath ("font_subtitle.png")
+		cinematX.IMGREF_FONT1	 =	Graphics.loadImage (cinematX.IMGNAME_FONT1)
+		
+		cinematX.subtitleFontProps = {}
+		cinematX.subtitleFontProps ["charWidth"] = 16
+		cinematX.subtitleFontProps ["charHeight"] = 16
+		cinematX.subtitleFontProps ["image"] = cinematX.IMGREF_FONT1
+		cinematX.subtitleFontProps ["kerning"] = -2
+		
+		cinematX.subtitleFont = Font.create (textblox.FONTTYPE_SPRITE, cinematX.subtitleFontProps)
+		
+		
+		cinematX.subtitleBoxProps = {}
+		cinematX.subtitleBoxProps ["width"] = 800-24
+		cinematX.subtitleBoxProps ["height"] = 132-32
+		cinematX.subtitleBoxProps ["scaleMode"] = textblox.SCALE_FIXED
+		cinematX.subtitleBoxProps ["bind"] = textblox.BIND_SCREEN
+		cinematX.subtitleBoxProps ["textAlpha"] = 1
+		cinematX.subtitleBoxProps ["textAnchorX"] = textblox.HALIGN_LEFT
+		cinematX.subtitleBoxProps ["textAnchorY"] = textblox.VALIGN_TOP
+		cinematX.subtitleBoxProps ["boxAnchorX"] = textblox.HALIGN_LEFT
+		cinematX.subtitleBoxProps ["boxAnchorY"] = textblox.VALIGN_TOP
+		cinematX.subtitleBoxProps ["boxColor"] = 0x999900AA
+		cinematX.subtitleBoxProps ["boxType"] = textblox.BOXTYPE_NONE
+		cinematX.subtitleBoxProps ["font"] = cinematX.subtitleFont
+		cinematX.subtitleBoxProps ["speed"] = 0.5
+		cinematX.subtitleBoxProps ["marginX"] = 4
+		cinematX.subtitleBoxProps ["marginY"] = 4
+		cinematX.subtitleBoxProps ["visible"] = true
+		
+		cinematX.subtitleBoxBlock = TextBlock.create (8, 468+32, "", cinematX.subtitleBoxProps)
 		
 		
 		-- Has this function been called?
@@ -2055,6 +2331,7 @@ do
 		cinematX.IMGNAME_BLANK	 				=	cinematX.getImagePath ("blankImage.png")
 		cinematX.IMGNAME_LETTERBOX 				=	cinematX.getImagePath ("letterbox.png")
 		cinematX.IMGNAME_FULLOVERLAY			=	cinematX.getImagePath ("fullScreenOverlay.png")
+		cinematX.IMGNAME_NOGLFADE				=	cinematX.getImagePath ("noglFade.png")
 		cinematX.IMGNAME_PLAYDIALOGBOX			=	cinematX.getImagePath ("playSubtitleBox.png")
 		cinematX.IMGNAME_QUESTBOX				=	cinematX.getImagePath ("questBox.png")
 		cinematX.IMGNAME_BOSSHP_RIGHT 			= 	cinematX.getImagePath ("bossHP_right.png")
@@ -2085,6 +2362,7 @@ do
 		cinematX.IMGREF_BLANK				=	Graphics.loadImage (cinematX.IMGNAME_BLANK)
 		cinematX.IMGREF_LETTERBOX 			=	Graphics.loadImage (cinematX.IMGNAME_LETTERBOX)
 		cinematX.IMGREF_FULLOVERLAY			=	Graphics.loadImage (cinematX.IMGNAME_FULLOVERLAY)
+		cinematX.IMGREF_NOGLFADE			=	Graphics.loadImage (cinematX.IMGNAME_NOGLFADE)
 		cinematX.IMGREF_QUESTBOX			=	Graphics.loadImage (cinematX.IMGNAME_QUESTBOX)
 		cinematX.IMGREF_PLAYDIALOGBOX		=	Graphics.loadImage (cinematX.IMGNAME_PLAYDIALOGBOX)
 		cinematX.IMGREF_BOSSHP_RIGHT 		= 	Graphics.loadImage (cinematX.IMGNAME_BOSSHP_RIGHT)
@@ -2118,6 +2396,8 @@ do
 		
 		cinematX.refreshHUDOverlay ()
 	end
+	
+	
 	
 	function cinematX.initActors ()
 		--cinematX.playerDummyActor = 
@@ -2356,6 +2636,7 @@ do
 							local parsedKey       = cinematX.parseTagFromNPCMessage (msgStr, "key")
 							local parsedName      = cinematX.parseTagFromNPCMessage (msgStr, "name")
 							local parsedTalkType  = cinematX.parseTagFromNPCMessage (msgStr, "verb")
+							local parsedAltSub    = cinematX.parseTagFromNPCMessage (msgStr, "sub")
 							local parsedIcon      = cinematX.parseTagFromNPCMessage (msgStr, "icon")
 							local parsedScene     = cinematX.parseTagFromNPCMessage (msgStr, "scene")
 							local parsedRoutine   = cinematX.parseTagFromNPCMessage (msgStr, "routine")
@@ -2373,6 +2654,12 @@ do
 							end
 							thisActor.nameString = parsedName
 						  
+							-- Store name if parsed
+							if (parsedAltSub == nil) then
+								parsedAltSub = ""
+							end
+							thisActor.altSubString = parsedAltSub
+						  
 							-- Store talk type string if parsed
 							if (parsedTalkType == nil) then
 								parsedTalkType = "talk"
@@ -2383,10 +2670,16 @@ do
 							thisActor.wordBubbleIcon = tonumber (parsedIcon)
 
 							-- Store scene
+							if (parsedScene == "nil") then
+								parsedScene = nil
+							end
 							thisActor.sceneString = parsedScene
 							--windowDebug (thisActor.sceneString)
 
 							-- Store routine
+							if (parsedRoutine == "nil") then
+								parsedRoutine = nil
+							end
 							thisActor.routineString = parsedRoutine
 
 							-- Store whether the actor is interactive
@@ -2455,10 +2748,7 @@ do
 		
 		
 		-- Hide the player
-		if  cinematX.playerHidden == true   then
-			player:mem (0x140, FIELD_WORD, 25)
-			player:mem (0x142, FIELD_WORD, 0)
-		end  
+		cinematX.playerActor.isHidden = cinematX.playerHidden  		
 	end
 
 	
@@ -2481,7 +2771,7 @@ do
 				if  (v ~= nil)  then
 					if  (v.smbxObjRef ~= nil)  then
 						if  (v:distanceActor (cinematX.playerActor) < 800   and   
-							 (v.isInteractive == true))						then
+							 (v.isInteractive == true  or  v.altSubString ~= nil))				then
 							
 							-- Check interaction type and whether the player has already spoken to the NPC
 							local tempIconType = 0
@@ -2514,14 +2804,23 @@ do
 							
 								-- If the player is close enough, store the NPC's index in 	currentMessageNPCIndex
 								if  v:distanceActor (cinematX.playerActor) < 48  then
-									cinematX.currentMessageNPCObj = v.smbxObjRef
-									cinematX.currentMessageNPCIndex = k
-									cinematX.currentMessageActor = v
+									
+									if  v.isInteractive  then
+										cinematX.currentMessageNPCObj = v.smbxObjRef
+										cinematX.currentMessageNPCIndex = k
+										cinematX.currentMessageActor = v
+									end
 									
 									--tempIcon = cinematX.IMGSLOT_NPCICON_PRESSUP
 									cinematX.subtitleBox = true
 									if  cinematX.dialogOn == false  then
-										cinematX.displayNPCSubtitle (v.nameString, "[UP] to "..v.talkTypeString..".")
+										local subStr = v.altSubString
+										
+										if  subStr == ""  then
+											subStr = "[UP] to "..v.talkTypeString.."."
+										end
+									
+										cinematX.displayNPCSubtitle (v.nameString, subStr)
 									end
 								end
 									
@@ -2599,6 +2898,7 @@ do
 		-- TRANSITION OUT OF SECTIONS		
 		local playerForcedAnimState = player:mem (0x122, FIELD_WORD)
 		local playerWarpTimer = player:mem (0x15C, FIELD_WORD)
+		local playerWarpType = player:mem (0x5A, FIELD_WORD)
 		
 		cinematX.playerWarpingPrev = cinematX.playerWarping
 		cinematX.playerWarping = false
@@ -2610,7 +2910,15 @@ do
 		if  (cinematX.playerWarping == true)  then
 			if  (cinematX.playerWarpingPrev == false)  then
 				if  cinematX.transitionBetweenSections == true then
-					cinematX.warpFade (0.25)
+					
+					-- Pipe
+					if  playerForcedAnimState == 3  then
+						cinematX.warpFade (0.8)
+					
+					-- Door
+					else
+						cinematX.warpFade (0.25)
+					end
 				end
 				
 			elseif   cinematX.screenTransitionAmt < 1  then
@@ -2624,8 +2932,24 @@ do
 		
 		-- SCREEN FADE
 		local screenFadeCol = 0x00000000 + math.floor(lerp(0, 255, cinematX.screenTransitionAmt))
-		graphX.boxScreen (0,0, 800,600,  screenFadeCol)
+		if  (cinematX.canUseNewUI == true)  then
+			graphX.boxScreen (0,0, 800,600,  screenFadeCol)
+		else
+			Graphics.drawImage (cinematX.IMGREF_NOGLFADE, 0,0, cinematX.screenTransitionAmt)
+		end
 		
+		
+		
+		-- Fade letterboxing
+		if	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_CUTSCENE)	then
+			cinematX.letterboxAlphaMult = math.min(1, cinematX.letterboxAlphaMult + cinematX.letterboxAlphaRate)
+		else
+			cinematX.letterboxAlphaMult = math.max(0, cinematX.letterboxAlphaMult - cinematX.letterboxAlphaRate)
+		end
+		cinematX.letterboxAlphaHex = 	lerp(0x00000000, 0x000000FF, cinematX.letterboxAlphaMax * cinematX.letterboxAlphaMult)
+		
+		
+			
 		
 		-- MENU BOXES
 		if (cinematX.useNewUI == true  and   cinematX.canUseNewUI == true)  then
@@ -2654,10 +2978,7 @@ do
 			
 			
 			-- Cutscene mode
-			elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_CUTSCENE)	then
-				graphX.boxScreen (0,0, 800,100,  0x000000FF)
-				graphX.boxScreen (0,468, 800,600-468,  0x000000FF)
-				
+			elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_CUTSCENE)	then		
 				
 				-- Disable the hud
 				hud (false)
@@ -2665,7 +2986,9 @@ do
 			
 			-- Play mode
 			elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_PLAY)		then
-				cinematX.drawMenuBox (30,7, 740,72,  0x00000099)
+				if  cinematX.useHUDBox == true  then
+					cinematX.drawMenuBox (30,7, 740,72,  0x00000099)
+				end
 				
 				if      (cinematX.dialogOn == true)       then
 					cinematX.drawMenuBox (2,468, 796,600-470,  0x00000099)
@@ -2673,16 +2996,23 @@ do
 					cinematX.drawMenuBox (30,500, 740,70,  0x00000099)
 				end
 			end
+			
+			
+			-- Letterboxing is faded in and out now
+			graphX.boxScreen (0,0, 800,100,  cinematX.letterboxAlphaHex)
+			graphX.boxScreen (0,468, 800,600-468,  cinematX.letterboxAlphaHex)
 		else
 
 			
-				
+			Graphics.drawImageWP (cinematX.IMAGEREF_LETTERBOX, 0, 0, cinematX.letterboxAlphaMult*cinematX.letterboxAlphaMax, 3.494)
+
+		
 		
 			if  cinematX.currentImageRef_hud  ~=  nil	then
-				Graphics.placeSprite (1, cinematX.currentImageRef_hud, 0, 0, "", 2)	
+				Graphics.drawImageWP (cinematX.currentImageRef_hud, 0, 0, 3.494)
 			end
 			if  cinematX.currentImageRef_screen  ~=  nil	then
-				Graphics.placeSprite (1, cinematX.currentImageRef_screen, 0, 0, "", 2)
+				Graphics.drawImageWP (cinematX.currentImageRef_screen, 0, 0, 3.494)
 			end
 		end
 		
@@ -2696,16 +3026,16 @@ do
 			local raceEnemyIconX = lerp (raceMeterLeft, raceMeterRight, cinematX.raceEnemyPos)
 			local barY = 520
 
-			Graphics.placeSprite (1, cinematX.IMGREF_RACEFLAGSTART,	raceMeterLeft, 		barY, "", 2)
-			Graphics.placeSprite (1, cinematX.IMGREF_RACEFLAGEND,	raceMeterRight, 	barY, "", 2)
+			Graphics.drawImageWP (cinematX.IMGREF_RACEFLAGSTART,	raceMeterLeft, 		barY,  3.494)
+			Graphics.drawImageWP (cinematX.IMGREF_RACEFLAGEND,		raceMeterRight, 	barY,  3.494)
 
 			
 			if (racePlayerIconX > raceEnemyIconX)  then
-				Graphics.placeSprite (1, cinematX.IMGREF_RACEOPPONENT, 	raceEnemyIconX, 	barY, "", 2)
-				Graphics.placeSprite (1, cinematX.IMGREF_RACEPLAYER,    racePlayerIconX, 	barY, "", 2)
+				Graphics.drawImageWP (cinematX.IMGREF_RACEOPPONENT, 	raceEnemyIconX, 	barY,  3.494)
+				Graphics.drawImageWP (cinematX.IMGREF_RACEPLAYER,   	racePlayerIconX, 	barY,  3.494)
 			else
-				Graphics.placeSprite (1, cinematX.IMGREF_RACEPLAYER,   	racePlayerIconX, 	barY, "", 2)
-				Graphics.placeSprite (1, cinematX.IMGREF_RACEOPPONENT, 	raceEnemyIconX, 	barY, "", 2)			
+				Graphics.drawImageWP (cinematX.IMGREF_RACEPLAYER,   	racePlayerIconX, 	barY,  3.494)
+				Graphics.drawImageWP (cinematX.IMGREF_RACEOPPONENT, 	raceEnemyIconX, 	barY,  3.494)			
 			end
 		end
 			
@@ -2768,36 +3098,49 @@ do
 
 
 		-- DISPLAY DIALOGUE/SUBTITLES
-		if   cinematX.dialogOn == true  and  (cinematX.currentSceneState == cinematX.SCENESTATE_PLAY  or  cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE) then
+		if   cinematX.dialogOn == true  and  (cinematX.currentSceneState == cinematX.SCENESTATE_PLAY  or  cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE)  then
 
-			if(cinematX.dialogName ~= "") then
-			printText (cinematX.dialogName..":", 4, 5, 475)  
-			end
-			printText (string.sub (cinematX.dialogText, 1, 42), 4, 15, 495)
-			printText (string.sub (cinematX.dialogText, 43, 85), 4, 15, 515)
-			
-			if (cinematX.dialogIsQuestion == true) then
-				local 	tempBottomLine = "      YES                       NO          "
+			if  cinematX.textbloxSubtitle == true  then
+				cinematX.subtitleBoxBlock.visible = true
 				
-				if cinematX.getResponse() == true then
-						tempBottomLine = "    > YES <                     NO          "
+				if(cinematX.dialogName ~= "") then
+					textblox.print (cinematX.dialogName..":", 5, 475, cinematX.subtitleFont, textblox.HALIGN_LEFT, textblox.HALIGN_TOP, 999, 1)
 				end
-				
-				if cinematX.getResponse() == false then
-						tempBottomLine = "      YES                     > NO <        "
-				end
-				
-				printText (tempBottomLine, 4, 15, 555)
-			
-			else
-				printText (string.sub (cinematX.dialogText, 86, 128), 4, 15, 535)
-				printText (string.sub (cinematX.dialogText, 129, 171), 4, 15, 555)
 				
 				if   (cinematX.dialogEndWithInput == true  and  cinematX.dialogTextTime <= 0)   then
-					printText("(PRESS X TO CONTINUE)", 4, 400, 580)
+					textblox.print ("(PRESS X TO CONTINUE)", 800-8, 580, cinematX.subtitleFont, textblox.HALIGN_RIGHT, textblox.HALIGN_TOP, 999, 1)
 				end
+				
+			else
+				if(cinematX.dialogName ~= "") then
+					printText (cinematX.dialogName..":", 4, 5, 475)  
+				end
+				printText (string.sub (cinematX.dialogText, 1, 42), 4, 15, 495)
+				printText (string.sub (cinematX.dialogText, 43, 85), 4, 15, 515)
+				
+				if (cinematX.dialogIsQuestion == true) then
+					local 	tempBottomLine = "      YES                       NO          "
+					
+					if cinematX.getResponse() == true then
+							tempBottomLine = "    > YES <                     NO          "
+					end
+					
+					if cinematX.getResponse() == false then
+							tempBottomLine = "      YES                     > NO <        "
+					end
+					
+					printText (tempBottomLine, 4, 15, 555)
+				
+				else
+					printText (string.sub (cinematX.dialogText, 86, 128), 4, 15, 535)
+					printText (string.sub (cinematX.dialogText, 129, 171), 4, 15, 555)
+					
+					if   (cinematX.dialogEndWithInput == true  and  cinematX.dialogTextTime <= 0)   then
+						printText("(PRESS X TO CONTINUE)", 4, 400, 580)
+					end
 
-			end			
+				end			
+			end
 		end
 
 		
@@ -3052,7 +3395,6 @@ do
 	
 	function cinematX.updateDialog ()
 
-	
 		-- Display the text only revealed by the typewriter effect
 		local currentCharNum = math.floor (cinematX.dialogNumCharsCurrent)
 
@@ -3086,21 +3428,24 @@ do
 			-- Choose a response to a yes/no question
 			if  (cinematX.dialogIsQuestion == true)  then
 			
-				if (playerPressedLeft == true) then
+				if (inputs.state["left"] == inputs.PRESS) then
 					cinematX.questionPlayerResponse = true
 					cinematX.playSFXSingle (3)
 				end
 			
-				if (playerPressedRight == true) then
+				if (inputs.state["right"] == inputs.PRESS) then
 					cinematX.questionPlayerResponse = false
 					cinematX.playSFXSingle (3)
 				end
 			end
 			
 			-- Skip dialog if allowed
-			if  (playerPressedRun == true)  then
-				if (cinematX.dialogNumCharsCurrent < string.len (cinematX.dialogTextFull)
-						and  cinematX.dialogSkippable == true)  then
+			if  (inputs.state["run"] == inputs.PRESS)  then
+				if (cinematX.dialogSkippable == true  and  cinematX.getDialogFinished () == false)  then
+					
+					if  cinematX.textbloxSubtitle == true  then
+						cinematX.subtitleBoxBlock:finish ()
+					end
 					
 					cinematX.dialogNumCharsCurrent = string.len (cinematX.dialogTextFull)
 					cinematX.dialogTextTime = 0
@@ -3117,7 +3462,6 @@ do
 				end
 			end
 		end
-
 		
 	end
 
@@ -3163,20 +3507,32 @@ do
 	end
 	
 	
-	playerPressedLeft = false
-	playerPressedRight = false
-	playerPressedRun = false
-	playerPressedJump = false
-	
-	playerLeftKeyStop = false
-	playerRightKeyStop = false
-	playerRunKeyStop = false
-	playerJumpKeyStop = false
-	
 
 	-- OVERRIDE PLAYER MOVEMENT DURING CUTSCENES ---------------
-	function cinematX.onInputUpdate ()		
-		if  (cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   and   cinematX.freezeDuringCutscenes == true)  then
+	function cinematX.onInputUpdate ()
+		
+		-- Disable extra players' inputs
+		for  k,v in pairs(Player.get())  do
+			if  v ~= player  then
+				v.upKeyPressing = false
+				v.downKeyPressing = false
+				v.leftKeyPressing = false
+				v.rightKeyPressing = false
+				v.jumpKeyPressing = false
+				v.altJumpKeyPressing = false
+				v.runKeyPressing = false
+				v.altRunKeyPressing = false
+				v.dropItemKeyPressing = false
+				v.pauseKeyPressing = false	
+
+				--v:mem(0x62, FIELD_WORD, k)
+			end
+			
+			--Text.print ("0x62   "..tostring(v:mem(0x62, FIELD_WORD)), 8, 100+20*k)
+		end
+	
+	
+		if  (cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   and   cinematX.freezeDuringCutscenes == true)  or  (cinematX.freezePlayer == true)  then
 			player.upKeyPressing = false
 			player.downKeyPressing = false
 			
@@ -3499,14 +3855,78 @@ end
 --***************************************************************************************************
 
 do
+	cinematX.dialogSetting_promptDelay = 30
+	cinematX.dialogSetting_closeTime = -1
+	cinematX.dialogSetting_speakTime = 30
+	cinematX.dialogSetting_startSound = ""
+	cinematX.dialogSetting_blipSounds = {}
+	cinematX.dialogSetting_boxType = {}
+	cinematX.dialogSetting_bloxProps = {}
+	cinematX.dialogSetting_answers = {}
+
 
 	--function cinematX.setDialogRules (pause, skippable, needInput, textSpeed)
 	function cinematX.configDialog (skippable, needInput, textSpeed)
 		--cinematX.dialogPause = pause
 		cinematX.setDialogSkippable (skippable)
-		cinematX.setDialogInputWait (needInput or true)
-		cinematX.setDialogSpeed (textSpeed or 1)
+		
+		if  needInput ~= nil  then
+			cinematX.setDialogInputWait (needInput)
+		end
+		
+		if  textSpeed ~= nil  then
+			cinematX.setDialogSpeed (textSpeed)
+		end
 	end
+	
+	function cinematX.configDialogExt (properties)
+		if  properties ~= nil  then
+			if  properties["canSkip"] ~= nil  then
+				cinematX.setDialogSkippable (properties["canSkip"])
+			end
+
+			if  properties["autoEnd"] ~= nil  then
+				cinematX.setDialogInputWait (not properties["canSkip"])
+			end
+
+			if  properties["textSpeed"] ~= nil  then
+				cinematX.setDialogSpeed (properties["textSpeed"])
+			end
+			
+			if  properties["promptDelay"] ~= nil  then
+				cinematX.dialogSetting_promptDelay = properties["promptDelay"]
+			end
+			
+			if  properties["closeTime"] ~= nil  then
+				cinematX.dialogSetting_closeTime = properties["closeTime"]
+			end
+			
+			if  properties["speakTime"] ~= nil  then
+				cinematX.dialogSetting_speakTime = properties["speakTime"]
+			end
+			
+			if  properties["startSound"] ~= nil  then
+				cinematX.dialogSetting_startSound = properties["startSound"]
+			end
+			
+			if  properties["blipSounds"] ~= nil  then
+				cinematX.dialogSetting_blipSounds = properties["blipSounds"]
+			end
+			
+			if  properties["boxType"] ~= nil  then
+				cinematX.dialogSetting_boxType = properties["boxType"]
+			end
+			
+			if  properties["bloxProps"] ~= nil  then
+				cinematX.dialogSetting_bloxProps = properties["bloxProps"]
+			end
+			
+			if  properties["question"] ~= nil  then
+				cinematX.dialogIsQuestion = properties["question"]
+			end					
+		end
+	end
+	
 	
 	function cinematX.setDialogSpeed (textSpeed)
 		cinematX.dialogTextSpeed = textSpeed
@@ -3525,7 +3945,7 @@ do
 		cinematX.dialogIsQuestion = true
 		cinematX.questionPlayerResponse = nil
 	end
-
+	
 	function cinematX.getResponse ()
 		return cinematX.questionPlayerResponse
 	end
@@ -3580,7 +4000,7 @@ do
 	end
 
 
-	
+
 	function cinematX.startDialog (speakerActor, name, text, textTime, speakTime, sound)
 		local txtTime = textTime or 30
 		local spkTime = speakTime or 30
@@ -3602,6 +4022,89 @@ do
 		cinematX.dialogOn = true
 	end
 	
+	
+	cinematX.BOXTYPE_SUBTITLE = 0
+	cinematX.BOXTYPE_SMBX = 1
+	cinematX.BOXTYPE_TEXTBLOX = 2
+	
+	
+	function cinematX.startDialogExt (text, properties)
+		local txtName = ""
+		local speakerActor = nil
+		local promptTime = cinematX.dialogSetting_promptDelay
+		local closeTime = cinematX.dialogSetting_closeTime
+		local speakTime = cinematX.dialogSetting_speakTime
+		local startSound = cinematX.dialogSetting_startSound
+		local blipSounds = cinematX.dialogSetting_blipSounds
+		local skippable = cinematX.dialogSkippable
+		local autoEnd = cinematX.dialogEndWithInput
+		local boxType = cinematX.dialogSetting_boxType
+		local bloxProps = cinematX.dialogSetting_bloxProps
+		local answers = cinematX.dialogSetting_Answers
+		
+		if  properties ~= nil  then
+			if  properties["name"] ~= nil  then 
+				txtName = properties["name"]						-- string
+			end
+			
+			if  properties["actor"] ~= nil  then 
+				speakerActor = properties["actor"]					-- Actor ref
+			end
+
+			if  properties["promptDelay"] ~= nil  then 
+				promptTime = properties["promptDelay"]				-- int
+			end
+			
+			if  properties["closeTime"] ~= nil  then 
+				promptTime = properties["closeTime"]				-- int
+			end
+			
+			if  properties["speakTime"] ~= nil  then 
+				promptTime = properties["speakTime"]				-- int
+			end
+			
+			if  properties["startSound"] ~= nil  then 
+				startSound = properties["startSound"]				-- filename string
+			end
+			
+			if  properties["blipSounds"] ~= nil  then 
+				blipSounds = properties["blipSounds"]				-- table of filename strings
+			end
+			
+			if  properties["canSkip"] ~= nil  then 
+				skippable = properties["canSkip"]					-- boolean
+			end
+			
+			if  properties["autoEnd"] ~= nil  then 
+				autoEnd = properties["autoEnd"]						-- boolean
+			end
+			
+			if  properties["boxType"] ~= nil  then 
+				boxType = properties["boxType"]						-- box type enum
+			end
+			
+			if  properties["bloxProps"] ~= nil  then 
+				bloxProps = properties["bloxProps"]					-- textblox property table
+			end
+			
+			if  properties["answers"] ~= nil  then 
+				answers = properties["answers"]						-- textblox property table
+			end
+		end
+		
+		if  	boxType == cinematX.BOXTYPE_SUBTITLE	then
+			cinematX.startDialog (speakerActor, txtName, text, promptTime, speakTime, startSound)
+		
+		elseif  boxType == cinematX.BOXTYPE_SMBX		then
+			Text.showMessageBox (text)
+		
+		elseif  boxType == cinematX.BOXTYPE_TEXTBLOX	then  
+			Textblox.create ()
+		
+		end
+	end
+	
+	
 	function cinematX.triggerDialogSpeaker (speakerActor, timeVal)
 		cinematX.dialogSpeaker = speakerActor
 		cinematX.dialogSpeakerTime = timeVal
@@ -3611,6 +4114,24 @@ do
 		cinematX.dialogName = name
 		cinematX.dialogTextFull = cinematX.formatDialogForWrapping (text)
 		cinematX.dialogTextTime = textTime
+		
+		if  cinematX.textbloxSubtitle == true  then
+			cinematX.subtitleBoxBlock.text = text
+			cinematX.subtitleBoxBlock.charsShown = 0
+
+		end
+	end
+	
+	function cinematX.getDialogFinished ()
+		local result = false
+		
+		if  cinematX.textbloxSubtitle == true  then
+			result = cinematX.subtitleBoxBlock:isFinished ()
+		else
+			result = cinematX.dialogNumCharsCurrent >= string.len (cinematX.dialogTextFull)
+		end
+		
+		return result
 	end
 	
 	function cinematX.endDialogLine ()
@@ -3624,13 +4145,19 @@ do
 		
 		cinematX.dialogIsQuestion = false
 		
+		if  (cinematX.textbloxSubtitle == true)  then
+			cinematX.subtitleBoxBlock.visible = false
+			cinematX.subtitleBoxBlock:resetText("")
+
+		end
+		
 		cinematX.signal ("endDialog")
 	end
 
 	function cinematX.displayNPCSubtitle (name, text)
 		--cinematX.dialogOn = true
-		cinematX.printCenteredText (name, 4, 400, 500)
-		cinematX.printCenteredText (text, 4, 400, 520)
+		cinematX.printCenteredText (name, 4, 400, 510)
+		cinematX.printCenteredText (text, 4, 400, 530)
 	end
 	
 	function cinematX.processNPCMessage (npcIndex)
@@ -3812,7 +4339,7 @@ do
 		if  cinematX.useNewUI == true  and  cinematX.canUseNewUI == true  then
 			cinematX.drawMenuBox (30,140,740,200, 0x00000099)
 		else
-			Graphics.placeSprite (1, cinematX.IMGREF_QUESTBOX, 0, 0, "", 2)	
+			Graphics.drawImageWP (cinematX.IMGREF_QUESTBOX, 0, 0, 3.494)	
 		end
 		
 		
@@ -4025,7 +4552,6 @@ do
 		
 		-- Cutscene mode
 		elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_CUTSCENE)	then
-			cinematX.changeHudOverlay (cinematX.IMGREF_LETTERBOX)
 					
 			-- Disable the hud
 			hud (false)
@@ -4150,24 +4676,12 @@ do
 	
 	
 	function cinematX.drawMenuBorder (x,y,w,h)
-
-		-- Black outline
-		graphX.boxScreen (x-1,		y-1,	w+2,	3,		0x000000FF) -- Top
-		graphX.boxScreen (x-1,		y+h-1,	w+2,	3,		0x000000FF) -- Bottom
-		graphX.boxScreen (x-1,		y-1,	3,		h+2,	0x000000FF) -- Left
-		graphX.boxScreen (x+w-1,		y-1,	3,		h+2,	0x000000FF) -- Right
-		
-		-- White outline
-		graphX.boxScreen (x,			y,		w,		1,		0xFFFFFFFF) -- Top
-		graphX.boxScreen (x,			y+h,	w,		1,		0xFFFFFFFF) -- Bottom
-		graphX.boxScreen (x,			y,		1,		h,		0xFFFFFFFF) -- Left
-		graphX.boxScreen (x+w,		y,		1,		h,		0xFFFFFFFF) -- Right
-		
+		graphX.menuBorderScreen (x,y,w,h)
 	end
 
 	function cinematX.drawMenuBox (x,y,w,h, col)
 		-- Fill
-		graphX.boxScreen (x,y,w,h, col)		
+		graphX.boxScreen (x,y,w,h, col, graphX.MENU_FILL)		
 				
 		-- Border
 		cinematX.drawMenuBorder (x,y,w,h)
@@ -4311,6 +4825,10 @@ do
 		vy = vy/length;
 
 		return vx,vy
+	end
+	
+	function intToHexString (hexVal)
+		return string.format("%X", hexVal)
 	end
 	
 	function hexToDec (hexVal)

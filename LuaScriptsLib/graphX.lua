@@ -150,7 +150,7 @@ local graphX = {}
 
 	
 	function graphX.menuBoxLevel (x,y,w,h, col, fillTex, borderTable)
-		local x1,y1 = worldToScreen (x - 10, y + 10);
+		local x1,y1 = worldToScreen (x, y);
 		graphX.menuBoxScreen (x1,y1,w,h, col, fillTex, borderTable)
 	end
 	
@@ -164,8 +164,21 @@ local graphX = {}
 		graphX.boxScreen (x1,y1,math.abs(w),math.abs(h), col, texImg)
 					
 		-- Border
+		graphX.menuBorderScreen (x,y,w,h, borderTable)
+	end
+
+
+	function graphX.menuBorderLevel (x,y,w,h, borderTable)
+		local x1,y1 = worldToScreen (x, y);
+		graphX.menuBorderScreen (x1,y1,w,h, borderTable)
+	end
+	
+	function graphX.menuBorderScreen (x,y,w,h, borderTable)
+					
+		-- Border
 		drawMenuBorder (x,y,w,h, borderTable)
 	end
+
 	
 
 	function drawMenuBorder (x,y,w,h, borderTable)
@@ -183,7 +196,7 @@ local graphX = {}
 		local dlImg = borderTable["dlImg"] or graphX.BORDER_DL
 		local lImg = borderTable["lImg"] or graphX.BORDER_L
 
-		local th = borderTable["thick"] or 8
+		local th = borderTable["thick"] or 4
 		
 		local x1 = math.min(x,x+w)-th
 		local x2 = x
@@ -370,7 +383,7 @@ local graphX = {}
 	]]
 	
 	function graphX.progressBarLevel (x,y,w,h, col, align, amt)
-		local x1,y1 = worldToScreen (x - 10, y + 10);
+		local x1,y1 = worldToScreen (x, y);
 		graphX.progressBarScreen (x1,y1,w,h, col, align, amt)
 	end
 	
