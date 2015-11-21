@@ -4030,6 +4030,8 @@ do
 	
 	function cinematX.startDialogExt (text, properties)
 		local txtName = ""
+		local x = 0
+		local y = 0
 		local speakerActor = nil
 		local promptTime = cinematX.dialogSetting_promptDelay
 		local closeTime = cinematX.dialogSetting_closeTime
@@ -4043,6 +4045,14 @@ do
 		local answers = cinematX.dialogSetting_Answers
 		
 		if  properties ~= nil  then
+			if	properties["x"] ~= nil  then
+				x = properties["x"]
+			end
+			
+			if  properties["y"] ~= nil  then
+				y = properties["y"]
+			end
+		
 			if  properties["name"] ~= nil  then 
 				txtName = properties["name"]						-- string
 			end
@@ -4099,7 +4109,7 @@ do
 			Text.showMessageBox (text)
 		
 		elseif  boxType == cinematX.BOXTYPE_TEXTBLOX	then  
-			--Textblox.create ()
+			Textblox.create (x,y, text, bloxProps)
 		
 		end
 	end
