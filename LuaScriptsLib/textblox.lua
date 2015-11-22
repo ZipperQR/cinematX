@@ -1,13 +1,12 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.0a                                                      						*
+--  v0.2.0b                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
 
 local textblox = {} --Package table
-local SpriteAPI = loadSharedAPI("sprite");
 local graphX = loadSharedAPI("graphX");
 
 
@@ -19,7 +18,33 @@ function textblox.onInitAPI() --Is called when the api is loaded by loadAPI.
 end
 
 
-local textBlockRegister = {}
+textblox.textBlockRegister = {}
+textblox.textBlockGarbageQueue = {}
+textblox.resourcePath = "..\\..\\..\\LuaScriptsLib\\textblox\\"
+
+
+
+--***************************************************************************************************
+--                                                                                                  *
+--              FILE MANAGEMENT															    		*
+--                                                                                                  *
+--***************************************************************************************************
+
+	--[[
+	function textblox.getImagePath (filename)		
+		--windowDebug ("TEST")
+		
+		local localImagePath = Misc.resolveFile (filename)  
+						
+		if  localImagePath  ~=  nil  then
+			return localImagePath
+		end
+		
+		return textblox.resourcePath..filename
+	end
+	--]]
+
+
 
 
 
@@ -30,6 +55,7 @@ local textBlockRegister = {}
 --***************************************************************************************************
 
 do
+	
 	textblox.FONTTYPE_DEFAULT = 0
 	textblox.FONTTYPE_SPRITE = 1
 	textblox.FONTTYPE_TTF = 2   --NOT SUPPORTED YET
@@ -319,6 +345,26 @@ do
 end
 
 
+--***************************************************************************************************
+--                                                                                                  *
+--              DEFAULT FONTS															    		*
+--                                                                                                  *
+--***************************************************************************************************
+
+do 
+	textblox.FONT_DEFAULT = Font.create (textblox.FONTTYPE_DEFAULT, {})  
+
+	--textblox.IMGNAME_DEFAULTSPRITEFONT = textblox.getImagePath ("font_default.png")
+	--textblox.IMGNAME_DEFAULTSPRITEFONTX2 = textblox.getImagePath ("font_default_x2.png")
+
+	--textblox.IMGREF_DEFAULTSPRITEFONT = Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT)
+	--textblox.IMGREF_DEFAULTSPRITEFONTX2 = Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONTX2)
+	
+	--textblox.FONT_SPRITEDEFAULT = Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 8, charHeight = 8, image = IMGREF_DEFAULTSPRITEFONT, kerning = 0})
+	--textblox.FONT_SPRITEDEFAULTX2 = Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 8, charHeight = 8, image = IMGREF_DEFAULTSPRITEFONTX2, kerning = 0})
+end
+
+
 
 --***************************************************************************************************
 --                                                                                                  *
@@ -361,6 +407,8 @@ do
 		thisTextBlock.y = y
 		thisTextBlock.text = textStr
 		
+		thisTextBlock.z = properties["z"] or 2
+		
 		thisTextBlock.boxType = properties["boxType"] or textblox.BOXTYPE_MENU
 		thisTextBlock.boxTex = properties["boxTex"]
 		thisTextBlock.boxColor = properties["boxColor"] or 0x00AA0099 			-- transparent green
@@ -375,14 +423,25 @@ do
 		thisTextBlock.valign = properties["textAnchorY"] or textblox.VALIGN_TOP
 		
 		thisTextBlock.textAlpha = properties["textAlpha"] or 1
+
+		thisTextBlock.autoClose = properties["autoClose"]
+		if  thisTextBlock.autoClose == nil  then
+			thisTextBlock.autoClose = false
+		end
+		
+		thisTextBlock.finishDelay = properties["finishDelay"] or 10
 		
 		thisTextBlock.boxhalign = properties["boxAnchorX"] or textblox.HALIGN_LEFT
 		thisTextBlock.boxvalign = properties["boxAnchorY"] or textblox.VALIGN_TOP
-				
+		
+		thisTextBlock.typeSounds = properties["typeSounds"] or {}
+		thisTextBlock.startSound = properties["startSound"] or ""	
+		thisTextBlock.closeSound = properties["closeSound"] or ""
+		
 		thisTextBlock.font = properties["font"] or textblox.FONT_DEFAULT
 		
 		thisTextBlock.speed = properties["speed"] or 0.5
-		
+				
 		thisTextBlock.xMargin = properties["marginX"] or 4
 		thisTextBlock.yMargin = properties["marginY"] or 4
 
@@ -399,18 +458,21 @@ do
 		thisTextBlock.autoWidth = 1
 		thisTextBlock.autoHeight = 1
 		
-		
+		thisTextBlock.updatingChars = true
+		thisTextBlock.finished = false
+		thisTextBlock.deleteMe = false
+		thisTextBlock.index = -1
+				
 		thisTextBlock.filteredText = textStr
 		thisTextBlock.length = string.len(textStr)
 		
 		thisTextBlock.lastCharCounted = nil
-		thisTextBlock.charsCounted = 0
 		thisTextBlock.charsShown = 0
 		if (thisTextBlock.speed <= 0) then
 			thisTextBlock.charsShown = thisTextBlock.length
 		end
 		
-		table.insert(textBlockRegister, thisTextBlock)
+		table.insert(textblox.textBlockRegister, thisTextBlock)
 		
 		return thisTextBlock
 	end
@@ -508,11 +570,19 @@ do
 		
 		-- Draw box
 		if  self.boxType == textblox.BOXTYPE_MENU  then
-			textblox.drawMenuBox   (boxX-self.xMargin,  
-									boxY-self.yMargin,
-									boxWidth + 2*self.xMargin, 
-									boxHeight + 2*self.yMargin,
-									self.boxColor)
+			if  self.bind == textblox.BIND_SCREEN  then
+				graphX.menuBoxScreen (boxX-self.xMargin,
+									  boxY-self.yMargin,
+									  boxWidth + 2*self.xMargin, 
+									  boxHeight + 2*self.yMargin,
+									  self.boxColor)			
+			else
+				graphX.menuBoxLevel  (boxX-self.xMargin,
+									  boxY-self.yMargin,
+									  boxWidth + 2*self.xMargin, 
+									  boxHeight + 2*self.yMargin,
+									  self.boxColor)			
+			end
 		end
 		
 
@@ -557,8 +627,18 @@ do
 
 	
 	function TextBlock:resetText (textStr)
-		self:setText(textStr)
+		self.text = textStr
 		self.charsShown = 0
+		self.finished = false
+		self.updatingChars = true
+		self.pauseFrames = -1
+	
+	
+		text = textStr
+		self.charsShown = 0
+		self.updatingChars = true
+		self.finished = false
+		self.pauseFrames = -1
 	end
 	
 	function TextBlock:setText (textStr)
@@ -573,19 +653,40 @@ do
 		return string.len (self.textFiltered)
 	end
 
+	function  TextBlock:getFinished ()
+		return self:isFinished ()
+	end
 	
 	function TextBlock:isFinished ()
-		return 	self.charsShown >= self:getLength ()
+		return 	self.finished
 	end
 	
 	function TextBlock:finish ()
 		self.pauseFrames = -1
 		self.shakeFrames = -1
 		self.charsShown = self:getLength()
+		self.updatingChars = false
+		self.finished = true
+		self:onFinish ()
+	end
+	
+	function TextBlock:onFinish ()
+		if  self.autoClose == true  then
+			self:closeSelf ()
+		end
+	end
+	
+	function TextBlock:closeSelf ()
+		-- Do other stuff, then
+		self.deleteMe = true
 	end
 	
 	function TextBlock:delete ()
-		
+		if  self.index ~= -1  then
+			table.insert(textblox.textBlockGarbageQueue, self.index)
+		else
+			windowDebug ("ERROR: Trying to close a text block with an invalid index.")
+		end
 	end
 	
 	
@@ -599,126 +700,140 @@ do
 	
 	
 	function TextBlock:updateTiming ()
+
+		-- Subtract from the pause and shake timers
 		self.pauseFrames = math.max(self.pauseFrames - 1, 0)
 		self.shakeFrames = math.max(self.shakeFrames - 1, 0)
 	
-	
-		-- Clamp typewriter effect to full text length
-		if 	self.charsShown >= self:getLength ()  then
-			self.charsShown = self:getLength ()
-			
-			--windowDebug ("Chars per line: " .. self:getCharsPerLine () .. "\n\n" .. self:getTextWrapped (true))
-		end
-	
-		-- Increment typewriter effect
+
+		-- Increment typewriter effect once the pause delay is over
 		if  (self.pauseFrames <= 0)  then
-
-			self.charsShown = self.charsShown + 1
 			
-			local text = self:getTextWrapped ()
-			
-			
-			-- Skip and process commands
-			local continueSkipping = true
-			
-			while  (continueSkipping == true)  do
+			-- If all characters have been shown, clamp the typewriter effect to full text length and stop updating
+			if 	self.charsShown > self:getLength ()  then
+				self.charsShown = self:getLength ()
 				
-				-- Get current character
-				local currentChar = text:sub (self.charsShown, self.charsShown)
+				-- If hasn't started finishing, stop updating the characters and pause for the finish delay
+				if  self.updatingChars == true  then
+					self.updatingChars = false
+					self.pauseFrames = self.finishDelay
 				
-				-- if it's the start of a command...
-				if  currentChar == '<'  then
-					
-					-- ...First parse the command...
-					local commandEnd = text:find ('>', self.charsShown)
-					local fullCommand = text:sub (self.charsShown, commandEnd)
-					local commandName = fullCommand:match ('%a+', 1)
-					local commandArgsPlusEnd = nil
-					local commandArgs = nil
-					local abortNow = false
-					
-					if commandName ~= nil  then
-						commandArgsPlusEnd = fullCommand:match ('%s.+>', 1)--commandName:len())						
-						--windowDebug ("Name: " .. commandName .. "\nArgs plus end: " .. tostring(commandArgsPlusEnd))
-
-					end
-					
-					if  commandArgsPlusEnd ~= nil  then						
-						commandArgs = commandArgsPlusEnd:sub (2, commandArgsPlusEnd:len() - 1)
-					end
-
-					
-					-- ...then perform behavior based on the command...
-					-- Pause:  if no arguments, assume a full second
-					if  commandName == 'pause' then
-						--windowDebug (tostring(commandArgs))
-						
-						if  commandArgs == nil then
-							commandArgs = 60
-						end
-						
-						--windowDebug (tostring(commandArgs))
-						
-						self.pauseFrames = self.pauseFrames + commandArgs
-						abortNow = true
-					
-					
-					-- change speed
-					elseif  commandName == 'speed' then
-						if  commandArgs == nil then
-							commandArgs = 0.5
-						end
-						
-						self.speed = commandArgs
-						abortNow = true
-					
-					
-					-- Play sound effect
-					elseif  commandName == 'sound' then
-						if  commandArgs ~= nil then
-							local sound = Misc.resolveFile (commandArgs)
-							
-							if sound ~= nil  then
-								Audio.playSFX (sound)
-							end
-						end
-						
-						self.pauseFrames = self.pauseFrames + commandArgs
-				
-				
-					-- Shake
-					elseif  commandName == 'shake' then
-						if  commandArgs == 'screen' or commandArgs == '0' or commandArgs == nil  then
-							earthquake(8)
-							
-						elseif  commandArgs == 'box' or commandArgs == '1'  then
-							self.shakeFrames = 8
-						end
-					
-					end					
-				
-				
-					-- ...then add the length of the command to the displayed characters to skip the command
-					if  abortNow == true  then
-						continueSkipping = false
-						self.charsShown = self.charsShown - 1
-					end
-					
-					self.charsShown = self.charsShown + fullCommand:len()
-				
-				
-				-- Otherwise, stop processing
-				else
-					continueSkipping = false			
+				-- Once the finish delay is done, finish the block
+				elseif  self.finished == false  then
+					self.finished = true
+					self:onFinish ()
 				end
+				
+			-- Update the typewriter effect
+			else			
+				self.charsShown = self.charsShown + 1
+				
+				local text = self:getTextWrapped ()
+				
+				
+				-- Skip and process commands
+				local continueSkipping = true
+				
+				while  (continueSkipping == true)  do
+					
+					-- Get current character
+					local currentChar = text:sub (self.charsShown, self.charsShown)
+					
+					-- if it's the start of a command...
+					if  currentChar == '<'  then
+						
+						-- ...First parse the command...
+						local commandEnd = text:find ('>', self.charsShown)
+						local fullCommand = text:sub (self.charsShown, commandEnd)
+						local commandName = fullCommand:match ('%a+', 1)
+						local commandArgsPlusEnd = nil
+						local commandArgs = nil
+						local abortNow = false
+						
+						if commandName ~= nil  then
+							commandArgsPlusEnd = fullCommand:match ('%s.+>', 1)--commandName:len())						
+							--windowDebug ("Name: " .. commandName .. "\nArgs plus end: " .. tostring(commandArgsPlusEnd))
+
+						end
+						
+						if  commandArgsPlusEnd ~= nil  then						
+							commandArgs = commandArgsPlusEnd:sub (2, commandArgsPlusEnd:len() - 1)
+						end
+
+						
+						-- ...then perform behavior based on the command...
+						-- Pause:  if no arguments, assume a full second
+						if  commandName == 'pause' then
+							--windowDebug (tostring(commandArgs))
+							
+							if  commandArgs == nil then
+								commandArgs = 60
+							end
+							
+							--windowDebug (tostring(commandArgs))
+							
+							self.pauseFrames = self.pauseFrames + commandArgs
+							abortNow = true
+						
+						
+						-- change speed
+						elseif  commandName == 'speed' then
+							if  commandArgs == nil then
+								commandArgs = 0.5
+							end
+							
+							self.speed = commandArgs
+							abortNow = true
+						
+						
+						-- Play sound effect
+						elseif  commandName == 'sound' then
+							if  commandArgs ~= nil then
+								local sound = Misc.resolveFile (commandArgs)
+								
+								if sound ~= nil  then
+									Audio.playSFX (sound)
+								end
+							end
+							
+							self.pauseFrames = self.pauseFrames + commandArgs
+					
+					
+						-- Shake
+						elseif  commandName == 'shake' then
+							if  commandArgs == 'screen' or commandArgs == '0' or commandArgs == nil  then
+								earthquake(8)
+								
+							elseif  commandArgs == 'box' or commandArgs == '1'  then
+								self.shakeFrames = 8
+							end
+						
+						end					
+					
+					
+						-- ...then add the length of the command to the displayed characters to skip the command
+						if  abortNow == true  then
+							continueSkipping = false
+							self.charsShown = self.charsShown - 1
+						end
+						
+						self.charsShown = self.charsShown + fullCommand:len()
+					
+					
+					-- Otherwise, stop processing
+					else
+						continueSkipping = false			
+					end
+				end
+				
+				
+				
+				-- Pause for X frames
+				local framesToPause = (1/self.speed)
+				self.pauseFrames = self.pauseFrames + framesToPause
 			end
 			
-			
-			
-			-- Pause for X frames
-			local framesToPause = (1/self.speed)
-			self.pauseFrames = self.pauseFrames + framesToPause
-		end
+		end	
 		
 	end
 	
@@ -906,46 +1021,30 @@ do
 	function textblox.update ()
 		textblox.waveModeCycle = (textblox.waveModeCycle + 0.25)%360
 	
-		for k,v in pairs (textBlockRegister)  do
-			v:update ()
+		for k,v in pairs (textblox.textBlockRegister)  do
+			-- Set the key
+			v.index = k
+			
+			-- Call the delete functions of ones marked for deletion
+			if  v.deleteMe == true  then
+				v:delete ()
+				
+			-- Otherwise, run the update function
+			else
+				v:update ()
+			end
+			
+		end
+		
+		-- Empty the garbage queue
+		for k,v in pairs (textblox.textBlockGarbageQueue)  do
+			table.remove (textblox.textBlockRegister, v)
+			table.remove (textblox.textBlockGarbageQueue, k)
 		end
 	end
-end
-
 	
-
---***************************************************************************************************
---                                                                                                  *
---              DRAW BOXES																		    *
---                                                                                                  *
---***************************************************************************************************
-
-do
-	function textblox.drawMenuBorder (x,y,w,h)
-
-		-- Black outline
-		graphX.boxScreen (x-1,		y-1,	w+2,	3,		0x000000FF) -- Top
-		graphX.boxScreen (x-1,		y+h-1,	w+2,	3,		0x000000FF) -- Bottom
-		graphX.boxScreen (x-1,		y-1,	3,		h+2,	0x000000FF) -- Left
-		graphX.boxScreen (x+w-1,		y-1,	3,		h+2,	0x000000FF) -- Right
-		
-		-- White outline
-		graphX.boxScreen (x,			y,		w,		1,		0xFFFFFFFF) -- Top
-		graphX.boxScreen (x,			y+h,	w,		1,		0xFFFFFFFF) -- Bottom
-		graphX.boxScreen (x,			y,		1,		h,		0xFFFFFFFF) -- Left
-		graphX.boxScreen (x+w,		y,		1,		h,		0xFFFFFFFF) -- Right
-		
-	end
-
-	function textblox.drawMenuBox (x,y,w,h, col)
-		-- Fill
-		graphX.boxScreen (x,y,w,h, col)		
-				
-		-- Border
-		textblox.drawMenuBorder (x,y,w,h)
-	end
+	collectgarbage("collect")
 end	
-	
 	
 	
 return textblox

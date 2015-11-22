@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	cinematX.lua																		*
---  v0.0.8i                                                      						*
+--  v0.0.8j                                                      						*
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
 --	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
 --                                                                                      *
@@ -9,7 +9,7 @@
 
 local cinematX = {} --Package table
 local graphX = loadSharedAPI("graphX");
-local textblox = loadSharedAPI("textblox");
+textblox = loadSharedAPI("textblox");
 local eventu = loadSharedAPI("eventu");
 local npcconfig = loadSharedAPI("npcconfig");
 local colliders = loadSharedAPI("colliders");
@@ -2456,6 +2456,7 @@ do
 	
 		cinematX.updateMidpointCheck ()
 		cinematX.updateTiming ()
+		cinematX.updateTextblox ()
 		cinematX.updateScene ()
 		cinematX.updateActors ()
 		cinematX.updateNPCMessages ()
@@ -2501,6 +2502,21 @@ do
 		--cinematX.wakeUpWaitingThreads (cinematX.deltaTime)  
 	end
 
+	
+	function cinematX.updateTextblox ()
+		-- Trigger finish signals
+		for  k,v in pairs (textblox.textBlockRegister)  do  
+			if  v:getFinished () == true  then
+				cinematX.signal ("blockFinish_"..k)
+			end
+
+			if  v.deleteMe == true  then
+				cinematX.signal ("blockClose_"..k)
+			end
+		end		
+	end
+	
+	
 	function cinematX.updateScene ()
 
 		
@@ -3107,7 +3123,7 @@ do
 					textblox.print (cinematX.dialogName..":", 5, 475, cinematX.subtitleFont, textblox.HALIGN_LEFT, textblox.HALIGN_TOP, 999, 1)
 				end
 				
-				if   (cinematX.dialogEndWithInput == true  and  cinematX.dialogTextTime <= 0)   then
+				if   (cinematX.dialogEndWithInput == true  and  cinematX.dialogTextTime <= 0  and  cinematX.subtitleBoxBlock:getFinished() == true)   then
 					textblox.print ("(PRESS X TO CONTINUE)", 800-8, 580, cinematX.subtitleFont, textblox.HALIGN_RIGHT, textblox.HALIGN_TOP, 999, 1)
 				end
 				
@@ -3439,7 +3455,7 @@ do
 				end
 			end
 			
-			-- Skip dialog if allowed
+			-- Skip dialog if allowed			
 			if  (inputs.state["run"] == inputs.PRESS)  then
 				if (cinematX.dialogSkippable == true  and  cinematX.getDialogFinished () == false)  then
 					
@@ -3452,7 +3468,6 @@ do
 					cinematX.dialogSpeakerTime = 0
 				
 				elseif  (cinematX.dialogEndWithInput == true)   then
-				
 					if  (cinematX.dialogIsQuestion == true  and  cinematX.questionPlayerResponse == nil)  then
 						cinematX.playSFXSingle (10) -- 10 = skid, 14 = coin, 23 = shckwup
 					else
@@ -3760,6 +3775,7 @@ do
 		
 		return coroutine.yield ()
 	end
+	
 
 	function cinematX.signal (signalName)
 	
@@ -3772,10 +3788,41 @@ do
 		end
 	end
 	
+	
 	function cinematX.waitForDialog ()
 		cinematX.toConsoleLog ("Begin waiting for dialog")
 		
 		cinematX.waitSignal ("endDialog")
+	end
+	
+	
+	function cinematX.waitForTextblockFinished (object)
+		if  object ~= nil  then
+		
+			while (object.index == -1)  do
+				cinematX.yield ()
+			end
+			
+			cinematX.toConsoleLog ("Begin waiting for text block "..tostring(object.index).." to finish")
+			cinematX.waitSignal ("blockFinish_"..tostring(object.index))
+		else
+			windowDebug ("ERROR: INVALID TEXT BLOCK")
+		end
+	end
+	
+	
+	function cinematX.waitForTextblockClosed (object)
+		if  object ~= nil  then
+		
+			while (object.index == -1)  do
+				cinematX.yield ()
+			end
+			
+			cinematX.toConsoleLog ("Begin waiting for text block "..tostring(object.index).." to close")
+			cinematX.waitSignal ("blockClose_"..tostring(object.index))
+		else
+			windowDebug ("ERROR: INVALID TEXT BLOCK")
+		end
 	end
 end
 	 
@@ -3860,7 +3907,7 @@ do
 	cinematX.dialogSetting_speakTime = 30
 	cinematX.dialogSetting_startSound = ""
 	cinematX.dialogSetting_blipSounds = {}
-	cinematX.dialogSetting_boxType = {}
+	cinematX.dialogSetting_boxType = cinematX.BOXTYPE_SUBTITLE
 	cinematX.dialogSetting_bloxProps = {}
 	cinematX.dialogSetting_answers = {}
 
@@ -4029,6 +4076,8 @@ do
 	
 	
 	function cinematX.startDialogExt (text, properties)
+		local returnObj = nil
+		
 		local txtName = ""
 		local x = 0
 		local y = 0
@@ -4109,9 +4158,11 @@ do
 			Text.showMessageBox (text)
 		
 		elseif  boxType == cinematX.BOXTYPE_TEXTBLOX	then  
-			Textblox.create (x,y, text, bloxProps)
+			returnObj = TextBlock.create (x,y, text, bloxProps)
 		
 		end
+		
+		return returnObj
 	end
 	
 	
@@ -4128,10 +4179,12 @@ do
 		if  cinematX.textbloxSubtitle == true  then
 			cinematX.subtitleBoxBlock.text = text
 			cinematX.subtitleBoxBlock.charsShown = 0
-
+			cinematX.subtitleBoxBlock.finished = false
+			cinematX.subtitleBoxBlock.updatingChars = true
+			cinematX.subtitleBoxBlock.pauseFrames = -1
 		end
 	end
-	
+		
 	function cinematX.getDialogFinished ()
 		local result = false
 		
@@ -4143,7 +4196,7 @@ do
 		
 		return result
 	end
-	
+		
 	function cinematX.endDialogLine ()
 		cinematX.dialogOn = false
 		cinematX.dialogTextTime = 0
@@ -4212,6 +4265,7 @@ do
 		end
 	end
 	
+	
 	cinematX.playerNameASXT = function ()
 		return cinematX.playerNames ("Demo", "Iris", "Kood", "raocow", "Sheath")
 	end
@@ -4241,6 +4295,7 @@ do
 			return toadName
 		end
 	end
+	
 	
 	function cinematX.printCenteredText (text, font, xPos, yPos)
 	    if text ~= nil then
