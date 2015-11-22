@@ -1,5 +1,5 @@
 --graphX.lua 
---v0.3
+--v0.3a
 --Pretty blatantly based on colliders.lua by Hoeloe
 
 local graphX = {}
@@ -38,7 +38,7 @@ local graphX = {}
 		
 	end
 
-	local function worldToScreen(x,y)
+	function graphX.worldToScreen(x,y)
 		local b = getScreenBounds();
 		local x1 = x-b.left;
 		local y1 = y-b.top-(player:mem(0xD0, FIELD_DFLOAT))+30;
@@ -47,7 +47,7 @@ local graphX = {}
 
 	
 	function graphX.boxLevel (x,y,w,h, col, tex)
-		local x1,y1 = worldToScreen (x, y);
+		local x1,y1 = graphX.worldToScreen (x, y);
 		graphX.boxScreen (x1,y1,w,h, col, tex)
 	end
 	
@@ -78,7 +78,7 @@ local graphX = {}
 	
 	
 	function graphX.circleLevel (x,y,r, col)
-		local x1,y1 = worldToScreen (x, y);
+		local x1,y1 = graphX.worldToScreen (x, y);
 		graphX.circleScreen (x1,y1,r, col)
 	end
 	
@@ -150,7 +150,7 @@ local graphX = {}
 
 	
 	function graphX.menuBoxLevel (x,y,w,h, col, fillTex, borderTable)
-		local x1,y1 = worldToScreen (x, y);
+		local x1,y1 = graphX.worldToScreen (x, y);
 		graphX.menuBoxScreen (x1,y1,w,h, col, fillTex, borderTable)
 	end
 	
@@ -169,7 +169,7 @@ local graphX = {}
 
 
 	function graphX.menuBorderLevel (x,y,w,h, borderTable)
-		local x1,y1 = worldToScreen (x, y);
+		local x1,y1 = graphX.worldToScreen (x, y);
 		graphX.menuBorderScreen (x1,y1,w,h, borderTable)
 	end
 	
@@ -181,7 +181,7 @@ local graphX = {}
 
 	
 
-	function drawMenuBorder (x,y,w,h, borderTable)
+	local function drawMenuBorder (x,y,w,h, borderTable)
 
 		if borderTable == nil  then
 			borderTable = {}
@@ -383,7 +383,7 @@ local graphX = {}
 	]]
 	
 	function graphX.progressBarLevel (x,y,w,h, col, align, amt)
-		local x1,y1 = worldToScreen (x, y);
+		local x1,y1 = graphX.worldToScreen (x, y);
 		graphX.progressBarScreen (x1,y1,w,h, col, align, amt)
 	end
 	
@@ -408,7 +408,7 @@ local graphX = {}
 
 	
 	
-	function drawProgressBarLeft (x,y,w,h, col, amt)		
+	local function drawProgressBarLeft (x,y,w,h, col, amt)		
 		-- Fill
 		graphX.boxScreen (x,	y,	w*amt,	h,	col)		
 				
@@ -416,7 +416,7 @@ local graphX = {}
 		cinematX.drawMenuBorder (x,y,w,h)		
 	end
 	
-	function drawProgressBarRight (x,y,w,h, col, amt)		
+	local function drawProgressBarRight (x,y,w,h, col, amt)		
 		-- Fill
 		graphX.boxScreen (x + w*(1-amt),	y,	w*amt,	h,	col)		
 				
@@ -424,7 +424,7 @@ local graphX = {}
 		cinematX.drawMenuBorder (x,y,w,h)		
 	end
 
-	function drawProgressBarTop (x,y,w,h, col, amt)		
+	local function drawProgressBarTop (x,y,w,h, col, amt)		
 		-- Fill
 		graphX.boxScreen (x,	y,	w,	h*amt,	col)		
 				
@@ -432,7 +432,7 @@ local graphX = {}
 		cinematX.drawMenuBorder (x,y,w,h)		
 	end
 
-	function drawProgressBarBottom (x,y,w,h, col, amt)		
+	local function drawProgressBarBottom (x,y,w,h, col, amt)		
 		-- Fill
 		graphX.boxScreen (x,	y + h*(1-amt),	w,	h*amt,	col)		
 				
