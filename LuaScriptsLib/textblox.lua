@@ -671,6 +671,8 @@ do
 	end
 	
 	function TextBlock:onFinish ()
+		self.finished = true
+	
 		if  self.autoClose == true  then
 			self:closeSelf ()
 		end
@@ -695,6 +697,7 @@ do
 		
 		if  self.visible == true  then
 			self.autoWidth,self.autoHeight = self:draw ()
+			--Text.print("finished="..tostring(self.finished), 4, 400,300)
 		end
 	end
 	

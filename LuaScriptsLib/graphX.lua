@@ -3,10 +3,14 @@
 --Pretty blatantly based on colliders.lua by Hoeloe
 
 local graphX = {}
-
+local vectr = loadSharedAPI ("vectr")
 
 	graphX.resourcePath = "..\\..\\..\\LuaScriptsLib\\graphX\\"
 
+	graphX.imageWidths = {}
+	graphX.imageHeights = {}
+	
+	
 	local function getScreenBounds()
 		local h = (player:mem(0xD0, FIELD_DFLOAT));
 		local b = { left = player.x-400+player.speedX, right = player.x+400+player.speedX, top = player.y-260+player.speedY, bottom = player.y+340+player.speedY };
@@ -44,7 +48,7 @@ local graphX = {}
 		local y1 = y-b.top-(player:mem(0xD0, FIELD_DFLOAT))+30;
 		return x1,y1;
 	end
-
+	
 	
 	function graphX.boxLevel (x,y,w,h, col, tex)
 		local x1,y1 = graphX.worldToScreen (x, y);
@@ -54,6 +58,7 @@ local graphX = {}
 	function graphX.boxScreen (x,y,w,h, col, tex)
 		col = col or 0xFFFFFFFF; --0xFF000099;
 		Graphics.glSetTextureRGBA (tex, col);
+		
 		local pts = {};
 		local x1,y1 = x,y;
 		pts[0] = x1; 	pts[1] = y1;
@@ -75,6 +80,166 @@ local graphX = {}
 		Graphics.glDrawTriangles (pts, texpts, 6);
 		Graphics.glSetTextureRGBA (nil, 0xFFFFFFFF);
 	end
+
+	
+	
+	function graphX.boxLevelExt (x,y,w,h, properties)
+		local x1,y1 = graphX.worldToScreen (x, y);
+		graphX.boxScreenExt (x1,y1,w,h, properties)
+	end
+	
+	function graphX.boxScreenExt (x,y,w,h, properties)			
+		local x1,y1 = x,y;
+		local pts = {};
+		pts[1] = x1; 	pts[2] = y1;
+		pts[3] = x1+w;	pts[4] = y1;
+		pts[5] = x1;	pts[6] = y1+h;
+		pts[7] = x1;	pts[8] = y1+h;
+		pts[9] = x1+w;	pts[10] = y1+h;
+		pts[11] = x1+w; pts[12] = y1;
+		
+		graphX.polyExt (pts, properties)
+	end
+	
+	
+	
+	function graphX.quadLevelExt (points, properties)
+		for i=1, #points, 2 do 
+			local x1,y1 = graphX.worldToScreen (points[i], points[i+1]);
+			points[i],points[i+1] = x1,y1
+		end
+
+		graphX.quadScreenExt (points, properties)
+	end
+	
+	function graphX.quadScreenExt (points, properties)
+		local x1,x2,x3,x4 = points[1],points[3],points[5],points[7];
+		local y1,y2,y3,y4 = points[2],points[4],points[6],points[8];
+		
+		local pts = {};
+		pts[1] = x1; 	pts[2] = y1;
+		pts[3] = x2;	pts[4] = y2;
+		pts[5] = x3;	pts[6] = y3;
+		pts[7] = x3;	pts[8] = y3;
+		pts[9] = x4;	pts[10] = y4;
+		pts[11] = x1;	pts[12] = y1;
+		
+		graphX.polyExt (pts, properties)
+	end
+	
+	
+	
+	function graphX.polyExt (points, properties)
+		
+		-- Get properties
+		local uAdd, vAdd = 0,0
+		local tile = false
+		local col = 0xFFFFFFFF
+		local tex = nil
+		local texAngle = 0
+		local texScaleX = 1
+		local texScaleY = 1
+		
+		if  properties ~= nil  then
+			uAdd = properties["u"] or 0
+			vAdd = properties["v"] or 0
+			tex = properties["tex"]
+			texAngle = properties["texAngle"] or 0
+			texScaleX = properties["texScaleX"] or properties["texScale"] or 1
+			texScaleY = properties["texScaleY"] or properties["texScale"] or 1
+			
+			col = properties["color"] or 0xFFFFFFFF
+			tile = properties["tile"]
+			
+			if  tile == nil  then
+				tile = false
+			end			
+		end
+		
+		
+		-- Get UV bounds
+		Graphics.glSetTextureRGBA (tex, col);
+		local x1,x2,y1,y2 = points[1],points[1],points[2],points[2];
+		
+		for i=1, #points, 2 do 
+			-- Left- and rightmost
+			if  points[i] < x1  then 
+				x1 = points[i]
+			end
+			if  points[i] > x2  then 
+				x2 = points[i]
+			end
+			
+			-- Top- and bottommost
+			if  points[i+1] < y1  then 
+				y1 = points[i+1]
+			end
+			if  points[i+1] > y2  then 
+				y2 = points[i+1]
+			end
+		end
+		
+		
+		-- Calculate texture positioning
+		local shapeW,shapeH = x2-x1, y2-y1;
+		local xMid,yMid = (x1+x2)*0.5, (y1+y2)*0.5;
+		
+		local pixels = {};
+		local texW,texH = 2,2;
+		if   tex ~= nil  then
+			if  graphX.imageWidths[tex] == nil  then
+				pixels,texW,texH = Graphics.getPixelData(tex);
+				graphX.imageWidths[tex] = texW
+				graphX.imageHeights[tex] = texH
+			else
+				texW,texH = graphX.imageWidths[tex],graphX.imageHeights[tex]
+			end
+		end
+
+		local texL,texR,texT,texB = x1,x2,y1,y2;
+		
+		
+		if  tile == false  then
+			texW,texH = shapeW, shapeH;		
+		end
+		
+		texW,texH = texW*texScaleX, texH*texScaleY;
+		
+		
+		texL = xMid - texW*(0.5)--+uAdd);
+		texR = texL+texW;
+		texT = yMid - texH*(0.5)--+vAdd);
+		texB = texT+texH;
+		
+		if  texW == 0  or  texH == 0  then
+			return
+		end
+		
+		
+		-- Calculate rotation
+		local angleAdd = (texAngle) * (math.pi/180);
+		local cosMult, sinMult = math.cos(angleAdd), math.sin(angleAdd)
+		
+		-- Determine UVs
+		local uvs = {}
+		for i=1, (#points), 2  do
+			local rotX = xMid + cosMult * (points[i] - xMid) - sinMult * (points[i+1] - yMid);
+			local rotY = yMid + sinMult * (points[i] - xMid) + cosMult * (points[i+1] - yMid);
+			
+			local newU, newV = invLerp (texL,texR, rotX), invLerp (texT,texB, rotY);
+			
+			uvs[i] = newU;
+			uvs[i+1] = newV;
+			
+			--Text.print (string.format("%.2f", uvs[i])..", "..string.format("%.2f", uvs[i+1]), 4, 8, 120+10*i)
+		end
+		
+
+		-- Draw the poly
+		Graphics.glDrawTriangles (points, uvs, (#points + 1)/2);
+		Graphics.glSetTextureRGBA (nil, 0xFFFFFFFF);
+	end
+
 	
 	
 	function graphX.circleLevel (x,y,r, col)
@@ -181,7 +346,7 @@ local graphX = {}
 
 	
 
-	local function drawMenuBorder (x,y,w,h, borderTable)
+	function drawMenuBorder (x,y,w,h, borderTable)
 
 		if borderTable == nil  then
 			borderTable = {}
@@ -440,6 +605,50 @@ local graphX = {}
 		cinematX.drawMenuBorder (x,y,w,h)		
 	end
 		
+	
+	
+--***************************************************************************************************
+--                                                                       		                    *
+-- 				MATH																				*
+--                                                                                                  *
+--***************************************************************************************************
+	
+
+	
+	function lerp (minVal, maxVal, percentVal)
+		return (1-percentVal) * minVal + percentVal*maxVal;
+	end
+	
+	function invLerp (minVal, maxVal, amountVal)			
+		return (amountVal-minVal) / (maxVal - minVal)
+	end
+	
+	
+	--[[
+	-- math.cos and math.sin expect a radian value, and this little function converts degrees to radians
+	toRadians = function(degrees)
+		return degrees / 180 * math.pi 
+	end 
+	 
+	function rotateVector(point, xMid, yMid, degrees)
+		local x = origin.x + ( math.cos(toRadians(degrees)) * (point.x - origin.x) - math.sin(toRadians(degrees)) * (point.y - origin.y) )
+		local y = origin.y + ( math.sin(toRadians(degrees)) * (point.x - origin.x) + math.cos(toRadians(degrees)) * (point.y - origin.y) )
+		point.x = x
+		point.y = y
+	end
+	--]]
+	
+	
+	function graphX.rotateVector (xMid, yMid, xOff, yOff, angleAdd)
+		angleAdd = (angleAdd) * (math.pi/180); -- Convert to radians
+	
+		local newX = xMid + math.cos(angleAdd) * (xOff - xMid) - math.sin(angleAdd) * (yOff - yMid);
+		local newY = yMid + math.sin(angleAdd) * (xOff - xMid) + math.cos(angleAdd) * (yOff - yMid);
+ 
+		return newX,newY
+		
+	end
+	
 	
 		
 return graphX;

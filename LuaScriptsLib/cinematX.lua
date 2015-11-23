@@ -2168,7 +2168,7 @@ do
 		cinematX.subtitleFontProps ["charWidth"] = 16
 		cinematX.subtitleFontProps ["charHeight"] = 16
 		cinematX.subtitleFontProps ["image"] = cinematX.IMGREF_FONT1
-		cinematX.subtitleFontProps ["kerning"] = -2
+		cinematX.subtitleFontProps ["kerning"] = -1
 		
 		cinematX.subtitleFont = Font.create (textblox.FONTTYPE_SPRITE, cinematX.subtitleFontProps)
 		
@@ -2506,12 +2506,12 @@ do
 	function cinematX.updateTextblox ()
 		-- Trigger finish signals
 		for  k,v in pairs (textblox.textBlockRegister)  do  
-			if  v:getFinished () == true  then
-				cinematX.signal ("blockFinish_"..k)
-			end
-
 			if  v.deleteMe == true  then
-				cinematX.signal ("blockClose_"..k)
+				cinematX.signal ("blockClose_"..v.index)
+			end
+			
+			if  v.finished == true  then
+				cinematX.signal ("blockFinish_"..v.index)
 			end
 		end		
 	end
@@ -2828,8 +2828,9 @@ do
 									end
 									
 									--tempIcon = cinematX.IMGSLOT_NPCICON_PRESSUP
-									cinematX.subtitleBox = true
+
 									if  cinematX.dialogOn == false  then
+										cinematX.subtitleBox = true								
 										local subStr = v.altSubString
 										
 										if  subStr == ""  then
@@ -3020,9 +3021,9 @@ do
 		else
 
 			
-			Graphics.drawImageWP (cinematX.IMAGEREF_LETTERBOX, 0, 0, cinematX.letterboxAlphaMult*cinematX.letterboxAlphaMax, 3.494)
-
-		
+			if  cinematX.IMGREF_LETTERBOX ~= nil  then
+				Graphics.drawImageWP (cinematX.IMGREF_LETTERBOX, 0, 0, cinematX.letterboxAlphaMult*cinematX.letterboxAlphaMax, 3.494)
+			end		
 		
 			if  cinematX.currentImageRef_hud  ~=  nil	then
 				Graphics.drawImageWP (cinematX.currentImageRef_hud, 0, 0, 3.494)
@@ -3635,6 +3636,7 @@ do
 			cinematX.currentSceneState   ==  cinematX.SCENESTATE_PLAY)  then
 			
 				cinematX.processNPCMessage (cinematX.currentMessageNPCIndex)
+				cinematX.refreshHUDOverlay ()
 		end
 		
 		-- DEBUG: CONSOLE
@@ -4218,9 +4220,14 @@ do
 	end
 
 	function cinematX.displayNPCSubtitle (name, text)
-		--cinematX.dialogOn = true
-		cinematX.printCenteredText (name, 4, 400, 510)
-		cinematX.printCenteredText (text, 4, 400, 530)
+		if  cinematX.textbloxSubtitle == true  then
+			textblox.print (name, 400, 510, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, 999, 1)
+			textblox.print (text, 400, 530, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, 999, 1)
+		else
+			--cinematX.dialogOn = true
+			cinematX.printCenteredText (name, 4, 400, 510)
+			cinematX.printCenteredText (text, 4, 400, 530)
+		end
 	end
 	
 	function cinematX.processNPCMessage (npcIndex)
@@ -4620,7 +4627,8 @@ do
 					
 			-- Disable the hud
 			hud (false)
-
+			cinematX.changeHudOverlay (cinematX.IMGREF_BLANK)
+			
 		
 		-- Play mode
 		elseif	(cinematX.currentSceneState  ==  cinematX.SCENESTATE_PLAY)		then
