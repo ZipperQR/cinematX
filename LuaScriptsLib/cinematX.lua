@@ -1676,7 +1676,7 @@ do
 		
 		-- Prevent despawning  --NPCMemSet,NPC ID,0x12A,55,0,0,w, thanks Willhart!
 		if (self.shouldDespawn == false) then
-			self.smbxObjRef:mem (0x12A, FIELD_WORD, 55)
+			self.smbxObjRef:mem (0x12A, FIELD_WORD, 180)
 		end
 		
 		
@@ -3424,7 +3424,12 @@ do
 	
 	
 	function cinematX.updateDialog ()
-
+		
+		-- REMOVE THE TEXTBLOX SUBTITLE BLOCK
+		if  cinematX.textbloxSubtitle == false  then
+			cinematX.subtitleBoxBlock:closeSelf ()
+		end
+		
 		-- Display the text only revealed by the typewriter effect
 		local currentCharNum = math.floor (cinematX.dialogNumCharsCurrent)
 
@@ -3565,10 +3570,10 @@ do
 		for k,v in pairs(inputs.state) do
 			inputs.locked[k] = false
 			
-			if  v = inputs.PRESS  then  
+			if  v == inputs.PRESS  then  
 				cinematX.signal ("keyPress"..k)
 			end
-			if  v = inputs.RELEASE  then  
+			if  v == inputs.RELEASE  then  
 				cinematX.signal ("keyRelease"..k)
 			end
 		end
