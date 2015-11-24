@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	cinematX.lua																		*
---  v0.0.8l                                                      						*
+--  v0.0.8l1                                                      						*
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
 --	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
 --                                                                                      *
@@ -3562,10 +3562,18 @@ do
 	
 	
 		-- Re-enable input
-		for k,v in pairs(inputs.locked) do
+		for k,v in pairs(inputs.state) do
 			inputs.locked[k] = false
+			
+			if  v = inputs.PRESS  then  
+				cinematX.signal ("keyPress"..k)
+			end
+			if  v = inputs.RELEASE  then  
+				cinematX.signal ("keyRelease"..k)
+			end
 		end
-		
+	
+	
 		
 		-- Disable the player's inputs when in a cutscene
 		if  (cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   and   cinematX.freezeDuringCutscenes == true)  or  (cinematX.freezePlayer == true)  then
