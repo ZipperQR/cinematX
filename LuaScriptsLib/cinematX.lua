@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	cinematX.lua																		*
---  v0.0.8j                                                      						*
+--  v0.0.8l                                                      						*
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
 --	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
 --                                                                                      *
@@ -2418,6 +2418,7 @@ do
 	
 	function cinematX.initQuestSystem ()
 		--cinematX.defineQuest ("test", "Test Quest", "Test the quest the quest the test system")
+		cinematX.questData = Data (Data.DATA_WORLD, "cinematX", true)
 	end
 	
 
@@ -3124,7 +3125,20 @@ do
 					textblox.print (cinematX.dialogName..":", 5, 475, cinematX.subtitleFont, textblox.HALIGN_LEFT, textblox.HALIGN_TOP, 999, 1)
 				end
 				
-				if   (cinematX.dialogEndWithInput == true  and  cinematX.dialogTextTime <= 0  and  cinematX.subtitleBoxBlock:getFinished() == true)   then
+				if (cinematX.dialogIsQuestion == true) then
+					local 	tempBottomLine = "      YES                       NO          "
+					
+					if cinematX.getResponse() == true then
+							tempBottomLine = "    - YES -                     NO          "
+					end
+					
+					if cinematX.getResponse() == false then
+							tempBottomLine = "      YES                     - NO -        "
+					end
+					
+					textblox.print (tempBottomLine, 400, 555, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, 999, 1)
+
+				elseif   (cinematX.dialogEndWithInput == true  and  cinematX.dialogTextTime <= 0  and  cinematX.subtitleBoxBlock:getFinished() == true)   then
 					textblox.print ("(PRESS X TO CONTINUE)", 800-8, 580, cinematX.subtitleFont, textblox.HALIGN_RIGHT, textblox.HALIGN_TOP, 999, 1)
 				end
 				
@@ -3162,8 +3176,7 @@ do
 
 		
 		-- QUEST STUFF
-		if   cinematX.displayQuestTimer > 0   then
-			cinematX.displayQuestTimer = cinematX.displayQuestTimer - 1
+		if   cinematX.displayQuestInfo == true   then
 			cinematX.displayQuestState (cinematX.currentQuestKey)
 		end
 		
@@ -3548,7 +3561,20 @@ do
 		end
 	
 	
+		-- Re-enable input
+		for k,v in pairs(inputs.locked) do
+			inputs.locked[k] = false
+		end
+		
+		
+		-- Disable the player's inputs when in a cutscene
 		if  (cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   and   cinematX.freezeDuringCutscenes == true)  or  (cinematX.freezePlayer == true)  then
+			
+			for k,v in pairs(inputs.locked) do
+				inputs.locked[k] = true
+			end
+			
+			--[[
 			player.upKeyPressing = false
 			player.downKeyPressing = false
 			
@@ -3611,6 +3637,7 @@ do
 			player.runKeyPressing = false
 			player.altRunKeyPressing = false
 			player.dropItemKeyPressing = false
+			]]
 		end
 	end
 
@@ -3795,6 +3822,19 @@ do
 		cinematX.toConsoleLog ("Begin waiting for dialog")
 		
 		cinematX.waitSignal ("endDialog")
+	end
+	
+	
+	function cinematX.waitForKeyPress (keyString)
+		cinematX.toConsoleLog ("Begin waiting for "..keyString.." key pressed")
+		
+		cinematX.waitSignal ("keyPress"..keyString)
+	end
+	
+	function cinematX.waitForKeyRelease (keyString)
+		cinematX.toConsoleLog ("Begin waiting for "..keyString.." key released")
+		
+		cinematX.waitSignal ("keyRelease"..keyString)
 	end
 	
 	
@@ -4306,7 +4346,11 @@ do
 	
 	function cinematX.printCenteredText (text, font, xPos, yPos)
 	    if text ~= nil then
-		    printText (text, font, xPos-9 * string.len(text), yPos)
+			if  cinematX.textbloxSubtitle == true  then
+				textblox.print (text, xPos, yPos, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, 999, 1)
+			else
+				printText (text, font, xPos-9 * string.len(text), yPos)
+			end
 	    end
 	end
 end 
@@ -4389,9 +4433,13 @@ do
 	cinematX.questName = {}
 	cinematX.questDescr = {}
 	cinematX.currentQuestKey = ""
-	cinematX.displayQuestTimer = 0
+	cinematX.displayQuestInfo = false
 	
-
+	cinematX.QUESTSTATE_NOTSTARTED = 0
+	cinematX.QUESTSTATE_STARTED = 1
+	cinematX.QUESTSTATE_FINISHED = 2
+	
+	
 	function cinematX.defineQuest (questKey, missionName, missionText)
 		cinematX.setQuestName (questKey, missionName)
 		cinematX.setQuestDescription (questKey, missionText)
@@ -4415,9 +4463,9 @@ do
 		end
 		
 		
-		if		tempState == 1  then
+		if		tempState == cinematX.QUESTSTATE_STARTED  then
 			cinematX.printCenteredText ("QUEST ACCEPTED:", 4, 400, 200)
-		elseif	tempState == 2  then
+		elseif	tempState == cinematX.QUESTSTATE_FINISHED  then
 			cinematX.printCenteredText ("QUEST COMPLETED:", 4, 400, 200)
 		end
 		
@@ -4427,18 +4475,18 @@ do
 	end
 	
 	function cinematX.setQuestState (questKey, questState)
-		UserData.setValue("questState_" .. questKey, questState)
-		UserData.save()
+		cinematX.questData:set ("questState_" .. questKey, tostring(questState))
+		cinematX.questData:save ()
 		
-		if   questState ~= 0   then
+		if   questState ~= cinematX.QUESTSTATE_NOTSTARTED   then
 			cinematX.currentQuestKey = questKey
-			cinematX.displayQuestTimer = 120
+			cinematX.displayQuestInfo = true
 		end
 	end
 	
 	function cinematX.setQuestProgress (questKey, questProgress, newMessage)
-		UserData.setValue("questProg_" .. questKey, questProgress)
-		UserData.save()
+		cinematX.questData:set ("questProg_" .. questKey, tostring(questProgress))
+		cinematX.questData:save ()
 				
 		if (newMessage ~= "") then
 			cinematX.setQuestDescription (questKey, newMessage)
@@ -4446,29 +4494,42 @@ do
 	end
 	
 	function cinematX.initQuest (questKey)
-		cinematX.setQuestState (questKey, 0)
+		cinematX.setQuestState (questKey, cinematX.QUESTSTATE_NOTSTARTED)
 		cinematX.setQuestProgress (questKey, 0)
 	end
 
 	function cinematX.beginQuest (questKey)
-		cinematX.setQuestState (questKey, 1)
+		cinematX.setQuestState (questKey, cinematX.QUESTSTATE_STARTED)
 	end
 
 	function cinematX.finishQuest (questKey)
-		cinematX.setQuestState (questKey, 2)
+		cinematX.setQuestState (questKey, cinematX.QUESTSTATE_FINISHED)
+	end
+	
+	function cinematX.getQuestProgress (questKey)
+		local loadedData = cinematX.questData:get("questProg_"..questKey)
+		local returnval = -1
+		
+		if  loadedData ~= ""  then
+			returnval = tonumber (loadedData)
+		end
+		
+		return returnval
 	end
 	
 	function cinematX.getQuestState (questKey)
-		local returnval = UserData.getValue("questState_" .. questKey)
-		if returnval == nil then
-			returnval = -1
+		local loadedData = cinematX.questData:get("questState_"..questKey)
+		local returnVal = -1
+		
+		if loadedData ~= "" then
+			returnval = tonumber (loadedData)
 		end
 		
 		return returnval
 	end
 	
 	function cinematX.isQuestStarted (questKey)
-		if  cinematX.getQuestState (questKey) > 0  then
+		if  cinematX.getQuestState (questKey) ~= cinematX.QUESTSTATE_NOTSTARTED  then
 			return true
 		else
 			return false
@@ -4476,7 +4537,7 @@ do
 	end
 	
 	function cinematX.isQuestFinished (questKey)
-		if  cinematX.getQuestState (questKey) == 2  then
+		if  cinematX.getQuestState (questKey) == cinematX.QUESTSTATE_FINISHED  then
 			return true
 		else
 			return false

@@ -247,8 +247,12 @@ do
 			end
 			
 			
+			-- Process escape characters
+			--if  thisChar == '/'  then
+			
+			
 			-- Process inline commands
-			if  thisChar == '<'   then
+			if  thisChar == '<'  then --and  lastChar ~= '/'  then
 				
 				-- Stop processing the following text
 				markupCount = markupCount + 1
@@ -435,8 +439,19 @@ do
 		thisTextBlock.boxvalign = properties["boxAnchorY"] or textblox.VALIGN_TOP
 		
 		thisTextBlock.typeSounds = properties["typeSounds"] or {}
-		thisTextBlock.startSound = properties["startSound"] or ""	
+		thisTextBlock.startSound = properties["startSound"] or ""
+		thisTextBlock.finishSound = properties["finishSound"] or ""
 		thisTextBlock.closeSound = properties["closeSound"] or ""
+		
+		if  (thisTextBlock.startSound ~= "")  then
+			Audio.playSFX (thisTextBlock.startSound)
+		end
+		
+		thisTextBlock.typeSoundChunks = {}
+		for  k,v in pairs (thisTextBlock.typeSounds)  do
+			thisTextBlock.typeSoundChunks[k] = Audio.sfxOpen (v)
+		end
+		
 		
 		thisTextBlock.font = properties["font"] or textblox.FONT_DEFAULT
 		
@@ -653,6 +668,15 @@ do
 		return string.len (self.textFiltered)
 	end
 
+	
+	function TextBlock:playTypeSound ()
+		if  Audio.SfxIsPlaying(18) == false  and  self.typeSounds ~= {}  then
+			Audio.SfxPlayCh (18, self.typeSoundChunks [math.random( #self.typeSounds )], 0)
+		end
+	end
+	
+	
+	
 	function  TextBlock:getFinished ()
 		return self:isFinished ()
 	end
@@ -667,12 +691,16 @@ do
 		self.charsShown = self:getLength()
 		self.updatingChars = false
 		self.finished = true
+		
+		if  (self.finishSound ~= "")  then
+			Audio.playSFX (self.finishSound)
+		end
+
+		
 		self:onFinish ()
 	end
 	
-	function TextBlock:onFinish ()
-		self.finished = true
-	
+	function TextBlock:onFinish ()	
 		if  self.autoClose == true  then
 			self:closeSelf ()
 		end
@@ -680,6 +708,10 @@ do
 	
 	function TextBlock:closeSelf ()
 		-- Do other stuff, then
+		if  (self.closeSound ~= "")  then
+			Audio.playSFX (self.closeSound)
+		end
+		
 		self.deleteMe = true
 	end
 	
@@ -723,8 +755,7 @@ do
 				
 				-- Once the finish delay is done, finish the block
 				elseif  self.finished == false  then
-					self.finished = true
-					self:onFinish ()
+					self:finish ()
 				end
 				
 			-- Update the typewriter effect
@@ -733,6 +764,10 @@ do
 				
 				local text = self:getTextWrapped ()
 				
+				local currentChar = text:sub (self.charsShown, self.charsShown)
+				if (currentChar:match("%W") == false) then
+					self:playTypeSound ()
+				end
 				
 				-- Skip and process commands
 				local continueSkipping = true
@@ -740,7 +775,12 @@ do
 				while  (continueSkipping == true)  do
 					
 					-- Get current character
-					local currentChar = text:sub (self.charsShown, self.charsShown)
+					currentChar = text:sub (self.charsShown, self.charsShown)
+					local currentEscapeChar = text:sub (self.charsShown, self.charsShown+1)
+					
+					-- if it's an escape character
+					--if  currentEscapeChar ~= '/<'  then
+					--	self.charsShown = self.charsShown + 2
 					
 					-- if it's the start of a command...
 					if  currentChar == '<'  then
@@ -1048,6 +1088,14 @@ do
 	
 	collectgarbage("collect")
 end	
-	
+
+
+
+--***************************************************************************************************
+--                                                                                                  *
+--              UPDATE																			    *
+--                                                                                                  *
+--***************************************************************************************************
+
 	
 return textblox
