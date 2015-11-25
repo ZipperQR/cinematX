@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	cinematX.lua																		*
---  v0.0.8l1                                                      						*
+--  v0.0.8l2                                                      						*
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua  						*
 --	Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516       		*
 --                                                                                      *
@@ -417,7 +417,7 @@ do
 		thisActorObj.messageString = ""
 		thisActorObj.nameString = ""
 		thisActorObj.talkTypeString = ""
-		thisActorObj.altSubString = ""
+		thisActorObj.altSubString = nil
 		thisActorObj.wordBubbleIcon = nil
 		thisActorObj.messageIsNew = true
 
@@ -2671,10 +2671,10 @@ do
 							end
 							thisActor.nameString = parsedName
 						  
-							-- Store name if parsed
-							if (parsedAltSub == nil) then
-								parsedAltSub = ""
-							end
+							-- Store alt sub if parsed
+							--if (parsedAltSub == nil) then
+							--	parsedAltSub = nil
+							--end
 							thisActor.altSubString = parsedAltSub
 						  
 							-- Store talk type string if parsed
@@ -2834,7 +2834,7 @@ do
 										cinematX.subtitleBox = true								
 										local subStr = v.altSubString
 										
-										if  subStr == ""  then
+										if  subStr == nil  then
 											subStr = "[UP] to "..v.talkTypeString.."."
 										end
 									
@@ -4721,7 +4721,6 @@ do
 	function cinematX.changeHudOverlay (imageRef)
 
 		if   cinematX.currentImageRef_screen ~= imageRef   then
-			
 			
 			-- Screen overlay	
 			cinematX.currentImageRef_screen = imageRef
