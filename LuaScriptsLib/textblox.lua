@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.0b                                                      						*
+--  v0.2.0c                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
@@ -81,7 +81,7 @@ do
 		
 		
 		-- Default font
-		if  fontType == textblox.FONTTYPE_SPRITE  then
+		if  fontType == textblox.FONTTYPE_DEFAULT	then
 			thisFont.fontIndex = properties
 		end
 		
@@ -433,6 +433,18 @@ do
 			thisTextBlock.autoClose = false
 		end
 		
+		thisTextBlock.speed = properties["speed"] or 0.5
+		thisTextBlock.defaultSpeed = thisTextBlock.speed
+		
+		thisTextBlock.autoTime = properties["autoTime"]
+		if  (thisTextBlock.autoTime == nil)  then
+			thisTextBlock.autoTime = false
+		end
+		
+		thisTextBlock.endMarkDelay = properties["endMarkDelay"] or 20
+		thisTextBlock.midMarkDelay = properties["midMarkDelay"] or 10
+
+		
 		thisTextBlock.finishDelay = properties["finishDelay"] or 10
 		
 		thisTextBlock.boxhalign = properties["boxAnchorX"] or textblox.HALIGN_LEFT
@@ -455,8 +467,6 @@ do
 		
 		thisTextBlock.font = properties["font"] or textblox.FONT_DEFAULT
 		
-		thisTextBlock.speed = properties["speed"] or 0.5
-				
 		thisTextBlock.xMargin = properties["marginX"] or 4
 		thisTextBlock.yMargin = properties["marginY"] or 4
 
@@ -477,7 +487,11 @@ do
 		thisTextBlock.finished = false
 		thisTextBlock.deleteMe = false
 		thisTextBlock.index = -1
-				
+		
+		if  (thisTextBlock.autoTime == true)  then
+			thisTextBlock:insertTiming ()
+		end
+		
 		thisTextBlock.filteredText = textStr
 		thisTextBlock.length = string.len(textStr)
 		
@@ -486,6 +500,8 @@ do
 		if (thisTextBlock.speed <= 0) then
 			thisTextBlock.charsShown = thisTextBlock.length
 		end
+		
+		
 		
 		table.insert(textblox.textBlockRegister, thisTextBlock)
 		
@@ -642,22 +658,55 @@ do
 
 	
 	function TextBlock:resetText (textStr)
-		self.text = textStr
+		self:setText (textStr)
 		self.charsShown = 0
 		self.finished = false
 		self.updatingChars = true
 		self.pauseFrames = -1
+		self.speed = self.defaultSpeed
 	
-	
-		text = textStr
-		self.charsShown = 0
-		self.updatingChars = true
-		self.finished = false
-		self.pauseFrames = -1
+		if  self.autoTime == true  then
+			self:insertTiming ()
+		end		
+		
+		thisTextBlock.filteredText = textStr
+		thisTextBlock.length = string.len(textStr)
 	end
 	
+	
+	function TextBlock:insertTiming ()
+		
+		local newText = self.text
+		
+		-- Commas
+		newText = newText:gsub('%, ', ',<pause '..tostring(self.midMarkDelay)..'> ')
+		
+		
+		-- Colons and semicolons
+		newText = newText:gsub('%: ', ':<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub('%; ', ';<pause '..tostring(self.endMarkDelay)..'> ')
+
+		
+		-- Ellipses
+		newText = newText:gsub("%.%.%. ", 	".<pause "..tostring(self.midMarkDelay)..">"..
+											".<pause "..tostring(self.midMarkDelay)..">"..
+											". ")
+	
+		
+		
+		-- End punctuation
+		newText = newText:gsub('%? ', '%?<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub('%! ', '%!<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub('%. ', '%.<pause '..tostring(self.endMarkDelay)..'> ')
+		
+
+		
+		self.text = newText
+	end
+	
+	
 	function TextBlock:setText (textStr)
-		text = textStr
+		self.text = textStr
 	end
 	
 	function TextBlock:getLength ()
