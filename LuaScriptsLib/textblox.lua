@@ -669,8 +669,8 @@ do
 			self:insertTiming ()
 		end		
 		
-		thisTextBlock.filteredText = textStr
-		thisTextBlock.length = string.len(textStr)
+		self.filteredText = textStr
+		self.length = string.len(textStr)
 	end
 	
 	
