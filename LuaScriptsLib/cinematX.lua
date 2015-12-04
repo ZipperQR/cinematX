@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 --  cinematX.lua                                                                        *
---  v0.0.8m                                                                             *
+--  v0.0.8m1                                                                            *
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua                        *
 --  Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516            *
 --                                                                                      *
@@ -2319,8 +2319,8 @@ do
 		cinematX.IMGNAME_LETTERBOX 				=	cinematX.getImagePath ("letterbox.png")
 		cinematX.IMGNAME_FULLOVERLAY			=	cinematX.getImagePath ("fullScreenOverlay.png")
 		cinematX.IMGNAME_NOGLFADE				=	cinematX.getImagePath ("noglFade.png")
-		cinematX.IMGNAME_NOGLBOX_RED			=	cinematX.getImagePath ("noGlBox_red.png")
-		cinematX.IMGNAME_NOGLBOX_GREEN			=	cinematX.getImagePath ("noGlBox_green.png")
+		cinematX.IMGNAME_NOGLBOX_RED			=	cinematX.getImagePath ("noglBox_red.png")
+		cinematX.IMGNAME_NOGLBOX_GREEN			=	cinematX.getImagePath ("noglBox_green.png")
 		cinematX.IMGNAME_PLAYDIALOGBOX			=	cinematX.getImagePath ("playSubtitleBox.png")
 		cinematX.IMGNAME_QUESTBOX				=	cinematX.getImagePath ("questBox.png")
 		cinematX.IMGNAME_BOSSHP_RIGHT 			= 	cinematX.getImagePath ("bossHP_right.png")
@@ -2376,9 +2376,8 @@ do
 		cinematX.IMGREF_NPCICON_I_O			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_INSPECT_O)
 		cinematX.IMGREF_NPCICON_I_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_INSPECT_N)	
 		cinematX.IMGREF_NPCICON_PRESSUP		=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_PRESSUP)
-	   
-	   
-	   
+
+		
 		-- Stores the filename of the image loaded into IMGSLOT_HUD
 		cinematX.currentHudOverlay = ""
 	   
@@ -3095,8 +3094,8 @@ do
 			-- BAR 2 -- horizontal, bar-based, center-aligned
 			elseif	(barBranch == cinematX.BOSSHPDISPLAY_BAR2)		then
 				
-				cinematX.drawProgressBarLeft (50,530, 700,32,  0xBB0000FF,  cinematX.bossHPEase/cinematX.bossHPMax)
-				cinematX.drawProgressBarLeft (50,530, 700,32,  0x009900FF,  cinematX.bossHP/cinematX.bossHPMax)
+				cinematX.drawProgressBarLeft (50,530, 700,16,  0xBB0000FF,  cinematX.bossHPEase/cinematX.bossHPMax)
+				cinematX.drawProgressBarLeft (50,530, 700,16,  0x009900FF,  cinematX.bossHP/cinematX.bossHPMax)
 			
 				cinematX.bossHP = math.max (cinematX.bossHP, 0)
 				
@@ -4165,11 +4164,11 @@ do
 			end
 		   
 			if  properties["closeTime"] ~= nil  then
-				promptTime = properties["closeTime"]                   			        -- int
+				closeTime = properties["closeTime"]                   			        -- int
 			end
 		   
 			if  properties["speakTime"] ~= nil  then		
-				promptTime = properties["speakTime"]                  			        -- int
+				speakTime = properties["speakTime"]                  			        -- int
 			end
 		   
 			if  properties["startSound"] ~= nil  then
@@ -4194,6 +4193,10 @@ do
 		   
 			if  properties["bloxProps"] ~= nil  then
 				bloxProps = properties["bloxProps"]                                     -- textblox property table
+				
+				if  bloxProps["font"] == nil  then
+					bloxProps["font"] = cinematX.subtitleFont
+				end
 			end
 		   
 			if  properties["answers"] ~= nil  then
@@ -4208,6 +4211,14 @@ do
 			Text.showMessageBox (text)
 	   
 		elseif  boxType == cinematX.BOXTYPE_TEXTBLOX    then  
+			if  startSound ~= nil  then
+				cinematX.playSFXSDLSingle (startSound)
+			end
+			--[[
+			if   (speakerActor ~= nil  and  speakerActor ~= -1)   then
+				cinematX.triggerDialogSpeaker (speakerActor, speakTime)
+			end
+			]]
 			returnObj = TextBlock.create (x,y, text, bloxProps)
 	   
 		end
@@ -4817,7 +4828,9 @@ do
        
        
   	function cinematX.drawMenuBorder (x,y,w,h)
-		graphX.menuBorderScreen (x,y,w,h)
+		if  cinematX.useNewUI == true  and  cinematX.canUseNewUI == true  then
+			graphX.menuBorderScreen (x,y,w,h)
+		end
 	end
 
 	function cinematX.drawMenuBox (x,y,w,h, col)
@@ -4833,10 +4846,12 @@ do
 		
 		-- Fill
 		if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
-			if  col == 0xBB0000FF  then
-				Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y,	w*amt,	h,   3.495)
-			else
-				Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_GREEN, 	x,	y,	w*amt,	h,   3.495)
+			if  cinematX.delayedInitCounter > 0  then
+				if  col == 0xBB0000FF  then
+					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y, 0,0, w*amt,	h,   3.495)
+				else
+					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_GREEN, 	x,	y, 0,0,	w*amt,	h,   3.495)
+				end
 			end
 		else
 			graphX.boxScreen (x,	y,	w*amt,	h,	col)		
@@ -4851,10 +4866,12 @@ do
 		
 		-- Fill
 		if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
-			if  col == 0xBB0000FF  then
-				Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x + w*(1-amt),	y,	w*amt,	h,   3.495)
-			else
-				Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_GREEN, 	x + w*(1-amt),	y,	w*amt,	h,   3.495)
+			if  cinematX.delayedInitCounter > 0  then
+				if  col == 0xBB0000FF  then
+					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x + w*(1-amt),	y, 0,0,	w*amt,	h,   3.495)
+				else
+					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_GREEN, 	x + w*(1-amt),	y, 0,0, w*amt,	h,   3.495)
+				end
 			end
 		else
 			graphX.boxScreen (x + w*(1-amt),	y,	w*amt,	h,	col)		
@@ -4869,10 +4886,12 @@ do
 		
 		-- Fill
 		if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
-			if  col == 0xBB0000FF  then
-				Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y,	w,	h*amt,   3.495)
-			else
-				Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_GREEN, 	x,	y,	w,	h*amt,   3.495)
+			if  cinematX.delayedInitCounter > 0  then
+				if  col == 0xBB0000FF  then
+					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y, 0,0,	w,	h*amt,   3.495)
+				else
+					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_GREEN, 	x,	y, 0,0,	w,	h*amt,   3.495)
+				end
 			end
 		else
 			graphX.boxScreen (x,	y,	w,	h*amt,	col)		
@@ -4887,10 +4906,12 @@ do
 		
 		-- Fill
 		if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
-			if  col == 0xBB0000FF  then
-				Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y + h*(1-amt),	w,	h*amt,   3.495)
-			else
-				Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_GREEN, 	x,	y + h*(1-amt),	w,	h*amt,   3.495)
+			if  cinematX.delayedInitCounter > 0  then
+				if  col == 0xBB0000FF  then
+					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y + h*(1-amt), 0,0,	w,	h*amt,   3.495)
+				else
+					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_GREEN, 	x,	y + h*(1-amt), 0,0,	w,	h*amt,   3.495)
+				end
 			end
 		else
 			graphX.boxScreen (x,	y + h*(1-amt),	w,	h*amt,	col)		
