@@ -130,19 +130,19 @@ do
 		local sourceX = (index%16) * w
 		local sourceY = math.floor(index/16) * h
 
-
-		local percentX1 = sourceX/16
-		local percentY1 = sourceY/8
-		local percentX2 = (sourceX+1)/16
-		local percentY2 = (sourceY+1)/8
-		
+	
 		-- Draw character based on font type
 		if  self.fontType == textblox.FONTTYPE_DEFAULT  then		
 			Text.print (character, self.fontIndex, x, y)
 		elseif  self.fontType == textblox.FONTTYPE_SPRITE  then	
 			
-			if  textblox.useGlForFonts == true  then
+			--if  textblox.useGlForFonts == true  then
 				--[[
+				local percentX1 = sourceX/16
+				local percentY1 = sourceY/8
+				local percentX2 = (sourceX+1)/16
+				local percentY2 = (sourceY+1)/8
+				
 				if  self.verts[color] == nil  then
 					self.verts[color] = {}
 				end
@@ -165,9 +165,9 @@ do
 				table.insert (self.verts[color], x);		table.insert (self.verts[color], y+h);
 				table.insert (self.verts[color], x+w);		table.insert (self.verts[color], y);
 				]]
-			else
+			--else
 				Graphics.drawImageWP (self.imageRef, x, y, sourceX, sourceY, w, h, alpha, 3.495)
-			end
+			--end
 		end		
 	end
 	
