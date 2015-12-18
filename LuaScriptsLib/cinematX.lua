@@ -29,6 +29,7 @@ function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
 	registerEvent(cinematX, "onInputUpdate", "onInputUpdate", true) --Register the input event
 	registerEvent(cinematX, "onKeyDown", "onKeyDown", true) --Register the input event
 	registerEvent(cinematX, "onKeyUp", "onKeyUp", false) --Register the input event
+e	registerEvent(cinematX, "onCameraUpdate", "updateCamera", false) --Register the input event
 end
  
 --***************************************************************************************************
@@ -2186,11 +2187,6 @@ do
 	end
 
 	function cinematX.initCamera ()
-	   
-		-- Memory addresses of the camera's position           
-		cinematX.cameraXAddress = 0x00B2B984
-		cinematX.cameraYAddress = 0x00B2B9A0
-	   
 		cinematX.cameraFocusX = 0
 		cinematX.cameraFocusY = 0
 	   
@@ -2448,7 +2444,6 @@ do
 		cinematX.updateMidpointCheck ()
 		cinematX.updateTiming ()
 		cinematX.updateTextblox ()
-		cinematX.updateScene ()
 		cinematX.updateActors ()
 		cinematX.updateNPCMessages ()
 		cinematX.updateDialog ()
@@ -2508,7 +2503,7 @@ do
 	end
    
    
-	function cinematX.updateScene ()
+	function cinematX.updateCamera ()
 
 		-- Camera
 		--cinematX.cameraFocusX = cinematX.cameraFocusX + cinematX.cameraXSpeed
@@ -2887,6 +2882,7 @@ do
 
    
    
+   
 	cinematX.memMonitorAddress = 0x00B25068
 	cinematX.memMonitorField = 1
 	cinematX.memMonitorScroll = 32
@@ -3055,7 +3051,7 @@ do
 		if  cinematX.currentSceneState == cinematX.SCENESTATE_BATTLE   then
 
 			-- Boss Name
-			cinematX.printCenteredText (cinematX.bossName, 4, 400, 500)
+			cinematX.printCenteredText (cinematX.bossName, 4, 400, 520)
 			
 			
 			-- Different HP bar types
@@ -3097,7 +3093,7 @@ do
 				cinematX.drawProgressBarLeft (50,530, 700,16,  0xBB0000FF,  cinematX.bossHPEase/cinematX.bossHPMax)
 				cinematX.drawProgressBarLeft (50,530, 700,16,  0x009900FF,  cinematX.bossHP/cinematX.bossHPMax)
 			
-				cinematX.bossHP = math.max (cinematX.bossHP, 0)
+				cinematX.bossHP = math.min (math.max (cinematX.bossHP, 0), cinematX.bossHPMax)
 				
 			
 			
@@ -4846,7 +4842,7 @@ do
 		
 		-- Fill
 		if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
-			if  cinematX.delayedInitCounter > 0  then
+			if  cinematX.delayedInitCounter > 0  and  amt > 0  then
 				if  col == 0xBB0000FF  then
 					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y, 0,0, w*amt,	h,   3.495)
 				else
@@ -4866,7 +4862,7 @@ do
 		
 		-- Fill
 		if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
-			if  cinematX.delayedInitCounter > 0  then
+			if  cinematX.delayedInitCounter > 0  and  amt > 0  then
 				if  col == 0xBB0000FF  then
 					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x + w*(1-amt),	y, 0,0,	w*amt,	h,   3.495)
 				else
@@ -4886,7 +4882,7 @@ do
 		
 		-- Fill
 		if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
-			if  cinematX.delayedInitCounter > 0  then
+			if  cinematX.delayedInitCounter > 0  and  amt > 0  then
 				if  col == 0xBB0000FF  then
 					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y, 0,0,	w,	h*amt,   3.495)
 				else
@@ -4906,7 +4902,7 @@ do
 		
 		-- Fill
 		if 	cinematX.useNewUI == false  or  cinematX.canUseNewUI == false  then
-			if  cinematX.delayedInitCounter > 0  then
+			if  cinematX.delayedInitCounter > 0  and  amt > 0  then
 				if  col == 0xBB0000FF  then
 					Graphics.drawImageWP (cinematX.IMGREF_NOGLBOX_RED, 		x,	y + h*(1-amt), 0,0,	w,	h*amt,   3.495)
 				else

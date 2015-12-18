@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.0c                                                      						*
+--  v0.2.0d                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
@@ -22,6 +22,8 @@ textblox.textBlockRegister = {}
 textblox.textBlockGarbageQueue = {}
 textblox.resourcePath = "..\\..\\..\\LuaScriptsLib\\textblox\\"
 
+
+textblox.useGlForFonts = false
 
 
 --***************************************************************************************************
@@ -79,10 +81,22 @@ do
 		
 		thisFont.fontIndex = 4
 		
+		thisFont.verts = {}
+		thisFont.uvs = {}
+		
 		
 		-- Default font
 		if  fontType == textblox.FONTTYPE_DEFAULT	then
 			thisFont.fontIndex = properties
+			if      thisFont.fontIndex == 1  then
+				
+			elseif  thisFont.fontIndex == 2  then 
+			
+			elseif  thisFont.fontIndex == 3  then 
+			
+			elseif  thisFont.fontIndex == 4  then 
+			
+			end
 		end
 		
 		-- Sprite font
@@ -103,7 +117,11 @@ do
 	end	
 
 	
-	function Font:drawCharImage (character, x,y, opacity)
+	function Font:drawCharImage (character, x,y, opacity, color)
+		
+		if  color == nil  then
+			color = 0xFFFFFFFF
+		end
 		
 		local alpha = opacity or 1.00
 		local index = string.byte(character,1)-33
@@ -111,42 +129,86 @@ do
 		local h = self.charHeight
 		local sourceX = (index%16) * w
 		local sourceY = math.floor(index/16) * h
+
+
+		local percentX1 = sourceX/16
+		local percentY1 = sourceY/8
+		local percentX2 = (sourceX+1)/16
+		local percentY2 = (sourceY+1)/8
 		
 		-- Draw character based on font type
 		if  self.fontType == textblox.FONTTYPE_DEFAULT  then		
 			Text.print (character, self.fontIndex, x, y)
-		elseif  self.fontType == textblox.FONTTYPE_SPRITE  then		
-			Graphics.drawImageWP (self.imageRef, x, y, sourceX, sourceY, w, h, alpha, 3.495)
+		elseif  self.fontType == textblox.FONTTYPE_SPRITE  then	
+			
+			if  textblox.useGlForFonts == true  then
+				--[[
+				if  self.verts[color] == nil  then
+					self.verts[color] = {}
+				end
+				
+				if  self.uvs[color] == nil  then
+					self.uvs[color] = {}
+				end
+			
+				pts[1] = x1; 	pts[2] = y1;
+				pts[3] = x1+w;	pts[4] = y1;
+				pts[5] = x1;	pts[6] = y1+h;
+				pts[7] = x1;	pts[8] = y1+h;
+				pts[9] = x1+w;	pts[10] = y1+h;
+				pts[11] = x1+w; pts[12] = y1;
+			
+				table.insert (self.verts[color], x);		table.insert (self.verts[color], y);
+				table.insert (self.verts[color], x+w);		table.insert (self.verts[color], y);
+				table.insert (self.verts[color], x);		table.insert (self.verts[color], y+h);
+				table.insert (self.verts[color], x);		table.insert (self.verts[color], y+h);
+				table.insert (self.verts[color], x);		table.insert (self.verts[color], y+h);
+				table.insert (self.verts[color], x+w);		table.insert (self.verts[color], y);
+				]]
+			else
+				Graphics.drawImageWP (self.imageRef, x, y, sourceX, sourceY, w, h, alpha, 3.495)
+			end
 		end		
 	end
 	
+		
+	function Font:drawTris ()
+		--graphX.
+	end
+	
 
+	function textblox.printExt (text, properties)
+		--if  properties ~= nil  then
+	end
+	
+	
 	function textblox.print (text, x,y, font, halign, valign, width, opacity)
 		-- Setup
 		local lineBreaks = 0
 		local charsOnLine = 0
-		local strLength = text:len()
+		local totalShownChars = 0
+		local currentLineWidth = 0
 		
-		local lineStr = ""
-		
+		if  font == nil  then
+			font = textblox.FONT_DEFAULT
+		end
+		if  width == nil  then
+			width = math.huge
+		end
+			
 		local totalWidth = 1
 		local totalHeight = 1
 		
 		local alpha = opacity or 1.00
 		
 		local startOfLine = 1
-		local currentLineWidth = 0
 		local fullLineWidth = 0
 		local charEndWidth = 0
 		local markupCount = 0
 		local i = 1
-		local totalShownChars = 0
 		
 		local t_halign = halign or textblox.HALIGN_LEFT
 		local t_valign = valign or textblox.VALIGN_TOP
-		
-		local lastSpaceX = nil
-		local lastSpaceY = nil
 		
 		local topmostY = 10000
 		local leftmostX = 10000
@@ -154,198 +216,190 @@ do
 		-- Effects
 		local shakeMode = false
 		local waveMode = false
+		local currentColor = 0xFFFFFFFF
 		
 		
-		while (i <= strLength) do 
+		-- Determine number of characters per line
+		local numCharsPerLine = math.floor((width)/(font.charWidth + font.kerning))
+		local mostCharsLine = 0
 		
-			-- Get character info
-			local lastNum = math.max(1, i-1)
-			
-			local lastChar = text:sub(lastNum, lastNum)
-			local thisChar = text:sub(i,i)
-			local nextChar = text:sub(i+1,i+1)
-			
-			local endOfLineA = text:len() - startOfLine
-			local endOfLineB = text:len() - i
-			local endOfLineC = text:find ("<br", startOfLine)
-			local endOfLine = nil
-			
-			endOfLine = endOfLineC
-			
-			
-			
-			local throwawayVar = nil
-			local allLineBreaks = nil
-			throwawayVar, allLineBreaks  = text:gsub('<br>','<br>')
-			
-			if  allLineBreaks == nil  then
-				allLineBreaks = 1
-			end
-			
-			
-			
-			local lineStrA = text:sub (startOfLine, endOfLine)
-			local lineStrB = lineStrA:gsub ('<.->', '')
-			lineStrB = lineStrB:gsub ('<.*','')
-			lineStrB = lineStrB:gsub ('.->','')
-			
-			if  i == strLength  then
-				--windowDebug ("CURRENT LINE BREAKS: " .. lineBreaks .. ", ALL LINE BREAKS: " .. allLineBreaks)
-				--windowDebug ("START: " .. tostring(startOfLine) .. "\nEND A: " .. tostring(endOfLineA) .. "\nEND B: " .. tostring(endOfLineB)  .. "\nDECIDED END: " .. tostring(endOfLine) .. "\n\n" .. lineStrA .. "\n\n" .. lineStrB)
-			end
-			
-			local continue = false
-			
-			
-			
-			-- Get line width info
-			fullLineWidth = (lineStrB:len()) * (font.charWidth + font.kerning)
-			currentLineWidth = (charsOnLine) * (font.charWidth + font.kerning)
-			charEndWidth = (charsOnLine+1) * (font.charWidth + font.kerning)
-	
-			if 	fullLineWidth > totalWidth  then
-				totalWidth = fullLineWidth
-			end
-			
-			totalHeight = (lineBreaks+1)*font.charHeight
-			
-			
-			-- Determine the position based on alignment
-			local xPos = nil
-			local yPos = nil
-			local fullLine = text:match('.*<br>', i)
+		
+		-- Positioning loop
+		local lineWidths = {}
+		local totalLineBreaks = 0
+		
+		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
+		
+			-- Is a command
+			if  string.find(textChunk, "<.*>") ~= nil  then
+				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
+				if  commandStr == nil  then
+					commandStr = string.match (textChunk, "[^<>%s]+")
+				end
+								
+				-- Line break
+				if  commandStr == "br"  then
+					lineWidths [lineBreaks] = charsOnLine*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
+					lineBreaks = lineBreaks + 1
+					totalLineBreaks = totalLineBreaks + 1
+					charsOnLine = 1
+				end
+		
+			-- Is plaintext
+			else
+				string.gsub (textChunk, ".", function(c)
+					-- Increment position counters
+					charsOnLine = charsOnLine + 1
+					totalShownChars = totalShownChars + 1
 
-			
-			if		t_halign == textblox.HALIGN_LEFT  then
-				xPos = x + currentLineWidth
-			
-			elseif	t_halign == textblox.HALIGN_RIGHT  then
-				xPos = x - fullLineWidth + currentLineWidth -- - font.charWidth
-			
-			else
-				xPos = x - 0.5*(fullLineWidth) + currentLineWidth
+					
+					if  charsOnLine > numCharsPerLine  then
+						lineWidths[lineBreaks] = (charsOnLine-1)*font.charWidth + math.max(0, charsOnLine-2)*font.kerning
+						lineBreaks = lineBreaks + 1
+						totalLineBreaks = totalLineBreaks + 1
+						charsOnLine = 1
+					end
+					
+					-- Get widest line
+					if  mostCharsLine < charsOnLine then
+						mostCharsLine = charsOnLine
+					end
+
+					return c
+				end)
 			end
+		end
+		lineWidths[lineBreaks] = (charsOnLine)*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
+
+		
+		-- Display loop
+		lineBreaks = 0
+		charsOnLine = 0
+		
+		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
 			
-			
-			if		t_valign == textblox.VALIGN_TOP  then
-				yPos = y + (lineBreaks*font.charHeight)
-			
-			elseif	t_valign == textblox.VALIGN_BOTTOM  then
-				yPos = y + (lineBreaks - allLineBreaks - 1)*font.charHeight
-			
-			else
-				yPos = y + (lineBreaks*font.charHeight)	- ((allLineBreaks+1)*font.charHeight*0.5)
-			end
-			
-			
-			-- Get top left coords
-			if  yPos < topmostY  then
-				topmostY = yPos
-			end
-			if  xPos < leftmostX  then
-				leftmostX = xPos
-			end
-			
-			
-			-- Process escape characters
-			--if  thisChar == '/'  then
-			
-			
-			-- Process inline commands
-			if  thisChar == '<'  then --and  lastChar ~= '/'  then
+			-- Is a command
+			if  string.find(textChunk, "<.*>") ~= nil  then
+				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
+				if  commandStr == nil  then
+					commandStr = string.match (textChunk, "[^<>%s]+")
+				end
 				
-				-- Stop processing the following text
-				markupCount = markupCount + 1
+				--[[
+				if  commandStr ~= nil  then
+					if  amountStr ~= nil then
+						Text.windowDebug (commandStr..", "..tostring(amountStr))
+					else
+						Text.windowDebug (commandStr)
+					end
+				end
+				]]
 				
 				-- Line break
-				if  text:sub (i, i+2) == '<br'  then 
-					startOfLine = endOfLine + 3
-					
+				if  commandStr == "br"  then
 					lineBreaks = lineBreaks + 1
-					charsOnLine = 0
-					--i = i + 2
-
-					
-				-- Toggle shake mode
-				elseif  text:sub (i, i+7) == '<tremble'  	then
+					charsOnLine = 1
+				end
+				
+				-- Shake text
+				if  commandStr == "tremble"  then
 					shakeMode = true
-					--i = i + 7
-				
-				-- Turn off shake mode
-				elseif  text:sub (i, i+8) == '</tremble'  	then
+				end
+				if  commandStr == "/tremble"  then
 					shakeMode = false
-					--i = i + 8
+				end
 				
-				-- Toggle wave mode
-				elseif  text:sub (i, i+4) == '<wave'  		then
+				-- Wave text
+				if  commandStr == "wave"  then
 					waveMode = true
-					--i = i + 4
-				
-				-- Turn off wave mode
-				elseif  text:sub (i, i+5) == '</wave'  		then
+				end
+				if  commandStr == "/wave"  then
 					waveMode = false
-					--i = i + 5
 				end
-
-
-			elseif  thisChar == ">"  then
-				markupCount = markupCount - 1
-				continue = true
-			end
-				
-				
-			-- Display the current character				
-			if  continue == false  and  markupCount <= 0  then				
-				
-				-- Ensure all apostrophes are displayed correctly
-				if  thisChar == "’"  or  thisChar == "‘"  then
-					thisChar = "'"
+			
+				-- Colored text
+				if  commandStr == "color"  then
+					currentColor = tonumber(amountStr)
 				end
-
-				-- Ignore spaces
-				if  thisChar ~= ' '  and  alpha > 0.0  then
+				
+				
+			-- Is plaintext
+			else
+				string.gsub (textChunk, ".", function(c)
 					
-					-- Process visual effects
-					local xAffected = xPos
-					local yAffected = yPos
-										
-					if  waveMode == true  then
-						yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)
+					-- Increment position counters
+					charsOnLine = charsOnLine + 1
+					totalShownChars = totalShownChars + 1
+
+					
+					if  charsOnLine > numCharsPerLine  then
+						lineBreaks = lineBreaks + 1
+						charsOnLine = 1
 					end
 					
-					if  shakeMode == true  then
-						local shakeX = 1--math.max(1, font.charWidth * 0.125)
-						local shakeY = 1--math.max(1, font.charHeight * 0.125)
+					-- Get widest line
+					if  mostCharsLine < charsOnLine then
+						mostCharsLine = charsOnLine
+					end
+
+					-- Ignore spaces
+					if  c ~= " " then
+
+						-- Determine position
+						currentLineWidth = math.max(0, charsOnLine-1) * font.charWidth    +   math.max(0, charsOnLine-2) * font.kerning
+						local xPos = x + currentLineWidth
+						local yPos = y + font.charHeight*lineBreaks
 						
-						xAffected = xAffected + math.random(-1*shakeX, shakeX)
-						yAffected = yAffected + math.random(-1*shakeY, shakeY)
+						
+						-- if different alignments, change those values
+						if	t_halign == textblox.HALIGN_RIGHT  then
+							xPos = xPos - lineWidths[lineBreaks] + currentLineWidth
+
+						elseif	t_halign == textblox.HALIGN_MID  then
+							xPos = x - 0.5*(lineWidths[lineBreaks]) + currentLineWidth
+						end
+
+
+						if	t_valign == textblox.VALIGN_BOTTOM  then
+							yPos = y + (lineBreaks - totalLineBreaks - 1)*font.charHeight
+
+						elseif t_valign == textblox.VALIGN_MID  then
+							yPos = y + (lineBreaks*font.charHeight)	- ((totalLineBreaks+1)*font.charHeight*0.5)
+						end
+
+						
+						-- Process visual effects
+						local xAffected = xPos
+						local yAffected = yPos
+											
+						if  waveMode == true  then
+							yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)
+						end
+						
+						if  shakeMode == true  then
+							local shakeX = math.max(0.5, font.charWidth * 0.125)
+							local shakeY = math.max(0.5, font.charHeight * 0.125)
+							
+							xAffected = xAffected + math.random(-1*shakeX, shakeX)
+							yAffected = yAffected + math.random(-1*shakeY, shakeY)
+						end
+						
+						-- Finally, draw the image
+						font:drawCharImage (c, xAffected, yAffected, alpha)
 					end
 					
-					
-					-- Finally, draw the image
-					font:drawCharImage (thisChar, xAffected, yAffected, alpha)
-				
-				
-				-- For debug purposes
-				else
-					lastSpaceX = xPos
-					lastSpaceY = yPos
-				end
-			
-				charsOnLine = charsOnLine + 1
-				totalShownChars = totalShownChars + 1
+					return c
+				end)
 			end
-			
-			
-			-- Increment i
-			i = i+1
+			--windowDebug (textChunk)
 		end
 		
-		--Text.print (tostring(totalShownChars), 4, leftmostX, topmostY-30)
-		--windowDebug ("W: " .. tostring(totalWidth) .. ",  H: " .. tostring(totalHeight))
+		totalWidth = mostCharsLine * (font.kerning + font.charWidth) - font.kerning
+		totalHeight = font.charHeight * lineBreaks
+		
 		return totalWidth, totalHeight
 	end
-
+	
 end
 
 
@@ -428,6 +482,10 @@ do
 		
 		thisTextBlock.textAlpha = properties["textAlpha"] or 1
 
+		thisTextBlock.mappedFilters = properties["mappedWordFilters"] or {}
+		thisTextBlock.unmappedReplacements = properties["replaceWords"] or {}
+		thisTextBlock.madlibsWords = properties["madlibWords"] or {}
+		
 		thisTextBlock.autoClose = properties["autoClose"]
 		if  thisTextBlock.autoClose == nil  then
 			thisTextBlock.autoClose = false
@@ -696,8 +754,16 @@ do
 		
 		-- End punctuation
 		newText = newText:gsub('%? ', '%?<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub('%?" ', '%?"<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub("%?' ", "%?'<pause "..tostring(self.endMarkDelay)..'> ')
+		
 		newText = newText:gsub('%! ', '%!<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub('%!" ', '%!"<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub("%!' ", "%!'<pause "..tostring(self.endMarkDelay)..'> ')
+		
 		newText = newText:gsub('%. ', '%.<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub('%." ', '%."<pause '..tostring(self.endMarkDelay)..'> ')
+		newText = newText:gsub("%.' ", "%.'<pause "..tostring(self.endMarkDelay)..'> ')
 		
 
 		
