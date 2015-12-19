@@ -1,19 +1,43 @@
 --***************************************************************************************
 --                                                                                      *
 --  cinematX.lua                                                                        *
---  v0.0.8m3                                                                            *
+--  v0.0.8m4                                                                            *
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua                        *
 --  Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516            *
 --                                                                                      *
 --***************************************************************************************
  
 local cinematX = {} --Package table
-local graphX = loadSharedAPI("graphX");
-local textblox = loadSharedAPI("textblox");
-local eventu = loadSharedAPI("eventu");
-local npcconfig = loadSharedAPI("npcconfig");
-local colliders = loadSharedAPI("colliders");
-local inputs = loadSharedAPI("inputs");
+local graphX, textblox, eventu, npcconfig, colliders, inputs;
+local libsLoaded = {}
+local libsToLoad = {"graphX", "textblox", "eventu", "npcconfig", "colliders", "inputs"}
+local libsMissingStr = ""
+
+-- Dependency check
+for k,v  in pairs(libsToLoad)  do
+	local isLoaded = pcall(function() libsLoaded = loadSharedAPI(v) end)
+	
+	if  isLoaded == false  then
+		if  libsMissingStr == ""  then
+			libsMissingStr = v
+		else
+			libsMissingStr = libsMissingStr..", "..v
+		end
+	end
+end
+
+if  libsMissingStr ~= ""  then
+	Text.windowDebug ("ERROR: Some dependencies were not found. \nPlease make sure the following libraries are in your LuaScriptsLib folder:\n\n"..libsMissingStr)
+	return cinematX
+end
+
+-- If all dependencies are found, assign them to their proper vars
+graphX = loadSharedAPI("graphX");
+textblox = loadSharedAPI("textblox");
+eventu = loadSharedAPI("eventu");
+npcconfig = loadSharedAPI("npcconfig");
+colliders = loadSharedAPI("colliders");
+inputs = loadSharedAPI("inputs");
  
  
  
