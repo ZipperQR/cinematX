@@ -27,7 +27,7 @@ for k,v  in pairs(libsToLoad)  do
 end
 
 if  libsMissingStr ~= ""  then
-	Text.windowDebug ("ERROR: Some dependencies were not found. \nPlease make sure the following libraries are in your LuaScriptsLib folder:\n\n"..libsMissingStr)
+	Text.windowDebug ("CINEMATX ERROR: Some dependencies were not found. \nPlease make sure the following libraries are in your LuaScriptsLib folder:\n\n"..libsMissingStr)
 	return cinematX
 end
 
