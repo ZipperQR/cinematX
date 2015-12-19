@@ -2199,7 +2199,7 @@ do
 		cinematX.dialogEndWithInput = true
 		
 		-- Does the player have to press a key to continue this specific message?
-		cinematX.thisDialogAutoEnd = true
+		cinematX.thisDialogAutoEnd = false
 
 		--
 		cinematX.dialogLineEnded = false
@@ -3804,34 +3804,7 @@ do
 		return eventu.waitSeconds (seconds)            
 	end
    
-   
-	function cinematX.wakeUpWaitingThreads (deltaTimeParam)
-		-- This function should be called once per game logic update with the amount of time
-		-- that has passed since it was last called
-		cinematX.CURRENT_TIME = cinematX.CURRENT_TIME + deltaTimeParam
- 
-		-- First, grab a list of the threads that need to be woken up. They'll need to be removed
-		-- from the WAITING_ON_TIME table which we don't want to try and do while we're iterating
-		-- through that table, hence the list.
-		local threadsToWake = {}
-		for co, wakeupTime in pairs(cinematX.WAITING_ON_TIME) do
-		   
-			--windowDebug (wakeupTime.."/"..cinematX.CURRENT_TIME)
-		   
-			if wakeupTime < cinematX.CURRENT_TIME then     
-				table.insert (threadsToWake, co)
-			end
-		end
- 
-		-- Now wake them all up.
-		for _, co in ipairs(threadsToWake) do
-			cinematX.WAITING_ON_TIME[co] = nil -- Setting a field to nil removes it from the table
-			cinematX.toConsoleLog ("Waking up")
-			coroutine.resume (co)
-		end
-	end
-
-	
+   	
 	function cinematX.runCoroutine (func)
 		if (func ~= nil)  then
 			return eventu.run (func)
@@ -3839,53 +3812,20 @@ do
 	end
 	
 	function cinematX.stopCoroutine (func)
-		return coroutine.yield (func)
+		--does nothing at the moment
 	end
 	 
-	 
-	--[[    DEMONSTRATION
-	 
-	runCoroutine (function ()
-			print ("Hello world. I will now astound you by waiting for 2 seconds.")
-			waitSeconds(2)
-			print ("Haha! I did it!")
-	end)
-	 
-	 
-	From the original author of this script:
-	"And that’s it. Call wakeUpWaitingThreads from your game logic loop and you’ll be able to have a bunch of functions waking up after sleeping for some period of time.
-	 
-	Note: this might not scale to thousands of coroutines. You might need to store them in a priority queue or something at that point."
-	--]]
-	 
+	
 	 
 	cinematX.WAITING_ON_SIGNAL = {}
 
 	function cinematX.waitSignal (signalName)
-		-- Same check as in waitSeconds; the main thread cannot wait
-		local co = coroutine.running ()
-		assert (co ~= nil, "The main thread cannot wait!")
-
-		if cinematX.WAITING_ON_SIGNAL[signalStr] == nil then
-			-- If there wasn't already a list for this signal, start a new one.
-			cinematX.WAITING_ON_SIGNAL[signalName] = { co }
-		else
-			table.insert (cinematX.WAITING_ON_SIGNAL[signalName], co)
-		end
-	   
-		return coroutine.yield ()
+		return eventu.waitSignal (signalName)
 	end
    
 
 	function cinematX.signal (signalName)
-
-		local threads = cinematX.WAITING_ON_SIGNAL[signalName]
-		if threads == nil then return end
-
-		cinematX.WAITING_ON_SIGNAL[signalName] = nil
-		for _, co in ipairs (threads) do
-			coroutine.resume (co)
-		end
+		eventu.signal (signalName)
 	end
    
    
@@ -4239,7 +4179,7 @@ do
 		local startSound = cinematX.dialogSetting_startSound
 		local blipSounds = cinematX.dialogSetting_blipSounds
 		local skippable = cinematX.dialogSkippable
-		local autoEnd = cinematX.dialogEndWithInput
+		local autoEnd = not cinematX.dialogEndWithInput
 		local autoTime = cinematX.dialogSetting_autoTime
 		local boxType = cinematX.dialogSetting_boxType
 		local bloxProps = cinematX.dialogSetting_bloxProps
@@ -4376,13 +4316,16 @@ do
 		   
 	function cinematX.getDialogFinished ()
 		local result = false
-	   
-		if  cinematX.textbloxSubtitle == true  then
-			result = cinematX.subtitleBoxBlock:isFinished ()
-		else
-			result = cinematX.dialogNumCharsCurrent >= string.len (cinematX.dialogTextFull)
+		
+		if  cinematX.dialogOn == true  then
+			if  cinematX.textbloxSubtitle == true  then
+				result = cinematX.subtitleBoxBlock:isFinished ()
+			else
+				result = cinematX.dialogNumCharsCurrent >= string.len (cinematX.dialogTextFull)
+			end
 		end
-	   
+		
+		
 		return result
 	end
 		   

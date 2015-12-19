@@ -163,7 +163,8 @@ function eventu.waitEvent(name)
 end
 
 function eventu.signal(name)
-		local waketable = {}
+		local waketable = {}  
+		if(signalQueue[name] == nil) then return end;
 		for k,v in pairs(signalQueue[name]) do
 			signalQueue[name][k] = nil;
 			table.insert(waketable, v);
