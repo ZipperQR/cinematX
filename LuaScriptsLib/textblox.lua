@@ -353,7 +353,7 @@ do
 						
 						-- if different alignments, change those values
 						if	t_halign == textblox.HALIGN_RIGHT  then
-							xPos = xPos - lineWidths[lineBreaks] + currentLineWidth
+							xPos = x - lineWidths[lineBreaks] + currentLineWidth
 
 						elseif	t_halign == textblox.HALIGN_MID  then
 							xPos = x - 0.5*(lineWidths[lineBreaks]) + currentLineWidth
