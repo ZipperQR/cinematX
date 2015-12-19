@@ -4031,6 +4031,10 @@ end
 --***************************************************************************************************
  
 do
+	cinematX.BOXTYPE_SUBTITLE = 0
+	cinematX.BOXTYPE_SMBX = 1
+	cinematX.BOXTYPE_TEXTBLOX = 2
+
 	cinematX.dialogSetting_promptDelay = 30
 	cinematX.dialogSetting_showPrompt = true
 	cinematX.dialogSetting_showThisPrompt = true
@@ -4219,11 +4223,6 @@ do
 		cinematX.triggerDialogText (name, text, txtTime)
 		cinematX.dialogOn = true
 	end
-   
-   
-	cinematX.BOXTYPE_SUBTITLE = 0
-	cinematX.BOXTYPE_SMBX = 1
-	cinematX.BOXTYPE_TEXTBLOX = 2
    
    
 	function cinematX.startDialogExt (text, properties)
