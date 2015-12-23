@@ -1,20 +1,22 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.0d                                                      						*
+--  v0.2.0e                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
 
 local textblox = {} --Package table
 local graphX = loadSharedAPI("graphX");
+local inputs = loadSharedAPI("inputs");
 
 
 function textblox.onInitAPI() --Is called when the api is loaded by loadAPI.
 	--register event handler
 	--registerEvent(string apiName, string internalEventName, string functionToCall, boolean callBeforeMain)
 	
-	registerEvent(textblox, "onLoop", "update", true) --Register the loop event
+	registerEvent(textblox, "onHUDDraw", "update", true) --Register the loop event
+	registerEvent(textblox, "onMessageBox", "onMessageBox", true) --Register the loop event
 end
 
 
@@ -24,7 +26,12 @@ textblox.resourcePath = "..\\..\\..\\LuaScriptsLib\\textblox\\"
 
 
 textblox.useGlForFonts = false
+textblox.overrideMessageBox = false
 
+textblox.currentMessage = nil
+
+		
+		
 
 --***************************************************************************************************
 --                                                                                                  *
@@ -76,7 +83,7 @@ do
 		thisFont.imageRef = nil
 			
 		thisFont.charWidth = 16
-		thisFont.charHeight = 20
+		thisFont.charHeight = 16
 		thisFont.kerning = 0
 		
 		thisFont.fontIndex = 4
@@ -177,6 +184,12 @@ do
 	end
 	
 
+	function textblox.getStringWidth (text, font)
+		local strLen = text:len() 
+		return  (strLen * font.charWidth) + (math.max(0, strLen-1) * font.kerning)
+	end
+	
+	
 	function textblox.printExt (text, properties)
 		--if  properties ~= nil  then
 	end
@@ -242,7 +255,7 @@ do
 					lineWidths [lineBreaks] = charsOnLine*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
 					lineBreaks = lineBreaks + 1
 					totalLineBreaks = totalLineBreaks + 1
-					charsOnLine = 1
+					charsOnLine = 0
 				end
 		
 			-- Is plaintext
@@ -253,11 +266,11 @@ do
 					totalShownChars = totalShownChars + 1
 
 					
-					if  charsOnLine > numCharsPerLine  then
+					if  charsOnLine > numCharsPerLine + 1  then
 						lineWidths[lineBreaks] = (charsOnLine-1)*font.charWidth + math.max(0, charsOnLine-2)*font.kerning
 						lineBreaks = lineBreaks + 1
 						totalLineBreaks = totalLineBreaks + 1
-						charsOnLine = 1
+						charsOnLine = 0
 					end
 					
 					-- Get widest line
@@ -298,7 +311,7 @@ do
 				-- Line break
 				if  commandStr == "br"  then
 					lineBreaks = lineBreaks + 1
-					charsOnLine = 1
+					charsOnLine = 0
 				end
 				
 				-- Shake text
@@ -332,9 +345,9 @@ do
 					totalShownChars = totalShownChars + 1
 
 					
-					if  charsOnLine > numCharsPerLine  then
+					if  charsOnLine > numCharsPerLine + 1  then
 						lineBreaks = lineBreaks + 1
-						charsOnLine = 1
+						charsOnLine = 0
 					end
 					
 					-- Get widest line
@@ -397,7 +410,7 @@ do
 		totalWidth = mostCharsLine * (font.kerning + font.charWidth) - font.kerning
 		totalHeight = font.charHeight * lineBreaks
 		
-		return totalWidth, totalHeight
+		return totalWidth, totalHeight, lineBreaks, lineWidths
 	end
 	
 end
@@ -410,7 +423,7 @@ end
 --***************************************************************************************************
 
 do 
-	textblox.FONT_DEFAULT = Font.create (textblox.FONTTYPE_DEFAULT, {})  
+	textblox.FONT_DEFAULT = Font.create (textblox.FONTTYPE_DEFAULT, 4)  
 
 	--textblox.IMGNAME_DEFAULTSPRITEFONT = textblox.getImagePath ("font_default.png")
 	--textblox.IMGNAME_DEFAULTSPRITEFONTX2 = textblox.getImagePath ("font_default_x2.png")
@@ -470,8 +483,13 @@ do
 		thisTextBlock.boxType = properties["boxType"] or textblox.BOXTYPE_MENU
 		thisTextBlock.boxTex = properties["boxTex"]
 		thisTextBlock.boxColor = properties["boxColor"] or 0x00AA0099 			-- transparent green
+		thisTextBlock.borderColor = properties["borderColor"] or 0xFFFFFFFF 			-- solid white
 		
-		thisTextBlock.scaleMode = properties["scaleMode"] or textblox.SCALE_FIXED
+		thisTextBlock.scaleMode = properties["scaleMode"]
+		if  thisTextBlock.scaleMode == nil  then
+			thisTextBlock.scaleMode = textblox.SCALE_FIXED
+		end
+		
 		thisTextBlock.width = properties["width"] or 200
 		thisTextBlock.height = properties["height"] or 200
 		
@@ -499,8 +517,14 @@ do
 			thisTextBlock.autoTime = false
 		end
 		
-		thisTextBlock.endMarkDelay = properties["endMarkDelay"] or 20
-		thisTextBlock.midMarkDelay = properties["midMarkDelay"] or 10
+		thisTextBlock.inputClose = properties["inputClose"]
+		if  (thisTextBlock.inputClose == nil)  then
+			thisTextBlock.inputClose = false
+		end
+		
+		
+		thisTextBlock.endMarkDelay = properties["endMarkDelay"] or 8
+		thisTextBlock.midMarkDelay = properties["midMarkDelay"] or 4
 
 		
 		thisTextBlock.finishDelay = properties["finishDelay"] or 10
@@ -533,6 +557,12 @@ do
 			thisTextBlock.visible = true
 		end
 		
+		thisTextBlock.pauseGame = properties["pauseGame"]
+		if  thisTextBlock.pauseGame == nil  then
+			thisTextBlock.pauseGame = false
+		end
+		
+		
 		
 		-- Control vars
 		thisTextBlock.pauseFrames = 0
@@ -559,6 +589,16 @@ do
 			thisTextBlock.charsShown = thisTextBlock.length
 		end
 		
+		if  (thisTextBlock.pauseGame == true)  then
+			Misc.pause ()
+			--[[
+			thisTextBlock.playerX = player.x
+			thisTextBlock.playerY = player.y
+			thisTextBlock.playerSpeedX = player.speedX
+			thisTextBlock.playerSpeedY = player.speedY
+			Defines.levelFreeze = true
+			]]
+		end
 		
 		
 		table.insert(textblox.textBlockRegister, thisTextBlock)
@@ -586,18 +626,28 @@ do
 	function TextBlock:draw ()
 		-- Get width and height
 		local textToShow = string.sub(self:getTextWrapped (), 1, self.charsShown)
+		local textForWidth = self:getTextWrapped ()
 		
+		--[[
+		self.autoWidth = textblox.getStringWidth (self.text, self.font)
+		self.autoHeight = self.font.charHeight + self.font.kerning
+		
+		while (self.autoWidth/self.autoHeight > 4/3)  do
+			self.autoWidth = self.autoWidth*0.5
+			self.autoHeight = self.autoHeight*2
+		end
+		--]]
 		
 		--self.autoWidth = 4
 		--self.autoHeight = 4
 		---[[
-		self.autoWidth, self.autoHeight = textblox.print   (textToShow, 
+		self.autoWidth, self.autoHeight = textblox.print   (textForWidth, 
 															9999, 
 															9999,
 															self.font,
 															self.halign,
 															self.valign,
-															self.width,
+															math.huge,--self.width,
 															0.0)
 		--]]
 		
@@ -614,8 +664,8 @@ do
 		local boxHeight = self.height 
 		
 		if  self.scaleMode == textblox.SCALE_AUTO  then
-			boxAlignX = self.halign
-			boxAlignY = self.valign
+			--boxAlignX = self.halign
+			--boxAlignY = self.valign
 			boxWidth = self.autoWidth
 			boxHeight = self.autoHeight 
 			--windowDebug ("TEST\n\n" .. tostring(self.autoWidth) .. "," .. tostring(self.autoHeight))
@@ -664,13 +714,13 @@ do
 									  boxY-self.yMargin,
 									  boxWidth + 2*self.xMargin, 
 									  boxHeight + 2*self.yMargin,
-									  self.boxColor)			
+									  self.boxColor)
 			else
 				graphX.menuBoxLevel  (boxX-self.xMargin,
 									  boxY-self.yMargin,
 									  boxWidth + 2*self.xMargin, 
 									  boxHeight + 2*self.yMargin,
-									  self.boxColor)			
+									  self.boxColor)
 			end
 		end
 		
@@ -705,8 +755,8 @@ do
 
 		-- Display text
 		self.autoWidth, self.autoHeight = textblox.print   (textToShow, 
-															textX, 
-															textY,
+															textX + self.font.charWidth*0.5, 
+															textY - self.font.charHeight*0.5,
 															self.font,
 															self.halign,
 															self.valign,
@@ -734,37 +784,63 @@ do
 	
 	function TextBlock:insertTiming ()
 		
-		local newText = self.text
+		local newText = ""
+		local insertTimingMode = true
 		
-		-- Commas
-		newText = newText:gsub('%, ', ',<pause '..tostring(self.midMarkDelay)..'> ')
-		
-		
-		-- Colons and semicolons
-		newText = newText:gsub('%: ', ':<pause '..tostring(self.endMarkDelay)..'> ')
-		newText = newText:gsub('%; ', ';<pause '..tostring(self.endMarkDelay)..'> ')
+		for textChunk in string.gmatch(self.text, "<*[^<>]+>*")	do
+			
+			-- Is a command
+			if  string.find(textChunk, "<.*>") ~= nil  then
+				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
+				if  commandStr == nil  then
+					commandStr = string.match (textChunk, "[^<>%s]+")
+				end
+				
+				-- notiming tags
+				if  commandStr == "notiming"  then
+					insertTimingMode = false
+				end
+				if  commandStr == "/notiming"  then
+					insertTimingMode = true
+				end
+				
+				
+			-- Is plaintext
+			elseif  insertTimingMode == true  then
+				-- Commas
+				textChunk = textChunk:gsub('%, ', ',<pause '..tostring(self.midMarkDelay)..'> ')
+				
+				
+				-- Colons and semicolons
+				textChunk = textChunk:gsub('%: ', ':<pause '..tostring(self.endMarkDelay)..'> ')
+				textChunk = textChunk:gsub('%; ', ';<pause '..tostring(self.endMarkDelay)..'> ')
 
-		
-		-- Ellipses
-		newText = newText:gsub("%.%.%. ", 	".<pause "..tostring(self.midMarkDelay)..">"..
-											".<pause "..tostring(self.midMarkDelay)..">"..
-											". ")
-	
-		
-		
-		-- End punctuation
-		newText = newText:gsub('%? ', '%?<pause '..tostring(self.endMarkDelay)..'> ')
-		newText = newText:gsub('%?" ', '%?"<pause '..tostring(self.endMarkDelay)..'> ')
-		newText = newText:gsub("%?' ", "%?'<pause "..tostring(self.endMarkDelay)..'> ')
-		
-		newText = newText:gsub('%! ', '%!<pause '..tostring(self.endMarkDelay)..'> ')
-		newText = newText:gsub('%!" ', '%!"<pause '..tostring(self.endMarkDelay)..'> ')
-		newText = newText:gsub("%!' ", "%!'<pause "..tostring(self.endMarkDelay)..'> ')
-		
-		newText = newText:gsub('%. ', '%.<pause '..tostring(self.endMarkDelay)..'> ')
-		newText = newText:gsub('%." ', '%."<pause '..tostring(self.endMarkDelay)..'> ')
-		newText = newText:gsub("%.' ", "%.'<pause "..tostring(self.endMarkDelay)..'> ')
-		
+				
+				-- Ellipses
+				textChunk = textChunk:gsub("%.%.%. ", 	".<pause "..tostring(self.midMarkDelay)..">"..
+														".<pause "..tostring(self.midMarkDelay)..">"..
+														". ")
+			
+				
+				
+				-- End punctuation
+				textChunk = textChunk:gsub('%? ', '%?<pause '..tostring(self.endMarkDelay)..'> ')
+				textChunk = textChunk:gsub('%?" ', '%?"<pause '..tostring(self.endMarkDelay)..'> ')
+				textChunk = textChunk:gsub("%?' ", "%?'<pause "..tostring(self.endMarkDelay)..'> ')
+				
+				textChunk = textChunk:gsub('%! ', '%!<pause '..tostring(self.endMarkDelay)..'> ')
+				textChunk = textChunk:gsub('%!" ', '%!"<pause '..tostring(self.endMarkDelay)..'> ')
+				textChunk = textChunk:gsub("%!' ", "%!'<pause "..tostring(self.endMarkDelay)..'> ')
+				
+				textChunk = textChunk:gsub('%. ', '%.<pause '..tostring(self.endMarkDelay)..'> ')
+				textChunk = textChunk:gsub('%." ', '%."<pause '..tostring(self.endMarkDelay)..'> ')
+				textChunk = textChunk:gsub("%.' ", "%.'<pause "..tostring(self.endMarkDelay)..'> ')
+			end
+			
+			
+			-- Append the string to the end of newText
+			newText = newText..textChunk
+		end
 
 		
 		self.text = newText
@@ -802,7 +878,7 @@ do
 	
 	function TextBlock:finish ()
 		self.pauseFrames = -1
-		self.shakeFrames = -1
+		self.shakeFrames = 0
 		self.charsShown = self:getLength()
 		self.updatingChars = false
 		self.finished = true
@@ -822,11 +898,23 @@ do
 	end
 	
 	function TextBlock:closeSelf ()
-		-- Do other stuff, then
+		-- Undo game pausing
+		if  self.pauseGame == true  then	
+			--[[
+			Defines.levelFreeze = false
+			player.speedX = self.playerSpeedX
+			player.speedY = self.playerSpeedY
+			inputs.locked["all"] = false
+			--]]
+			Misc.unpause ();
+		end
+		
+		-- Play close sound
 		if  (self.closeSound ~= "")  then
 			Audio.playSFX (self.closeSound)
 		end
 		
+		-- Add to the delete queue
 		self.deleteMe = true
 	end
 	
@@ -841,6 +929,25 @@ do
 	
 	function TextBlock:update ()
 		self:updateTiming ()
+		
+		if  self.pauseGame == true  then
+			--player.x = self.playerX
+			--player.y = self.playerY
+			--player.speedX = 0
+			--player.speedY = 0
+			
+			--inputs.locked["all"] = true
+		end
+		
+		if  self.inputClose == true			and  
+			(inputs.state["jump"] == inputs.PRESS or inputs.state["run"] == inputs.PRESS or inputs.state["altrun"] == inputs.PRESS) then
+			
+			if  self:getFinished () == true	 then
+				self:closeSelf ()
+			else
+				self:finish ()
+			end
+		end
 		
 		if  self.visible == true  then
 			self.autoWidth,self.autoHeight = self:draw ()
@@ -926,6 +1033,13 @@ do
 							
 							if  commandArgs == nil then
 								commandArgs = 60
+							end
+							
+							if  commandArgs == "mid"  then
+								commandArgs = midMarkDelay
+							end
+							if  commandArgs == "end"  then
+								commandArgs = endMarkDelay
 							end
 							
 							--windowDebug (tostring(commandArgs))
@@ -1199,9 +1313,37 @@ do
 			table.remove (textblox.textBlockRegister, v)
 			table.remove (textblox.textBlockGarbageQueue, k)
 		end
-	end
+		
+		collectgarbage("collect")
+	end	
 	
-	collectgarbage("collect")
+	
+	textblox.overrideProps =   {scaleMode = textblox.SCALE_AUTO, 
+							width = 400,
+							height = 350,
+							bind = textblox.BIND_SCREEN,
+							font = textblox.FONT_DEFAULT,
+							speed = 0.75,
+							boxType = textblox.BOXTYPE_MENU,
+							boxColor = 0x0000FFBB,
+							autoTime = true, 
+							pauseGame = true, 
+							inputClose = true, 
+							boxAnchorX = textblox.HALIGN_MID, 
+							boxAnchorY = textblox.VALIGN_MID, 
+							textAnchorX = textblox.HALIGN_TOP, 
+							textAnchorY = textblox.VALIGN_LEFT,
+							marginX = 4,
+							marginY = 16}
+	
+	
+	function textblox.onMessageBox(eventObj, message)
+		if textblox.overrideMessageBox == true  then
+			textblox.currentMessage = TextBlock.create (400,300, message, textblox.overrideProps)
+			Misc.pause ()
+			eventObj.cancelled = true			
+		end
+	end
 end	
 
 
