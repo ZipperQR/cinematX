@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 --  inputs.lua                                                                          *
---  v1.1                                                                                *
+--  v1.3                                                                                *
 --                                                                                      *
 --***************************************************************************************
 
@@ -66,6 +66,7 @@ local inputs = {} --Package table
 		inputs.state["altrun"] = inputs.UP
 		inputs.state["dropitem"] = inputs.UP
 		inputs.state["pause"] = inputs.UP
+		inputs.state["any"] = inputs.UP
 	end
 
 	
@@ -78,6 +79,7 @@ local inputs = {} --Package table
 	
 	do
 		inputs.locked = {}
+		inputs.locked["all"] = false
 		inputs.locked["up"] = false
 		inputs.locked["down"] = false
 		inputs.locked["left"] = false
@@ -122,6 +124,7 @@ local inputs = {} --Package table
 			i = i+1
 		end
 	end
+	
 
 	
 
@@ -140,19 +143,26 @@ local inputs = {} --Package table
 	
 		-- STORE INPUT STATE FOR EACH KEY
 		local i = 0
+		local anyPressed = false
+		local anyHeld = false
+		local anyReleased = false
 		
 		for k,v in pairs(inputs.state) do
 			if  inputs.state[k] == inputs.UP			then
 				if 	inputs.key[k] == true 	then
 					inputs.state[k] = inputs.PRESS
+					anyPressed = true
 				end
 			
 			elseif inputs.state[k] == inputs.PRESS		then
 				inputs.state[k] = inputs.HOLD
 			
 			elseif inputs.state[k] == inputs.HOLD		then
+				anyHeld = true
+				
 				if 	inputs.key[k] == false 	then
 					inputs.state[k] = inputs.RELEASE
+					anyReleased = true
 				end
 			
 			elseif inputs.state[k] == inputs.RELEASE	then
@@ -160,6 +170,17 @@ local inputs = {} --Package table
 			
 			end
 		end
+		
+		
+		-- Any key
+		if  (anyPressed == true  or  anyHeld == true)  and  inputs.state["any"] == inputs.UP  then
+			inputs.state["any"] = inputs.PRESS
+		end
+
+		if  (anyPressed == false  and  anyHeld == false)  and  inputs.state["any"] == inputs.HOLD  then
+			inputs.state["any"] = inputs.RELEASE
+		end
+
 		
 		
 		-- Disable locked keys
@@ -173,6 +194,21 @@ local inputs = {} --Package table
 		if  inputs.locked["altrun"] == true     then  player.altRunKeyPressing = false;         end
 		if  inputs.locked["dropitem"] == true   then  player.dropItemKeyPressing = false;       end
 		if  inputs.locked["pause"] == true      then  player.pauseKeyPressing = false;          end
+		
+		-- disable all keys
+		if  inputs.locked["all"] == true        then  
+			player.upKeyPressing = false;
+			player.downKeyPressing = false;
+			player.leftKeyPressing = false;
+			player.rightKeyPressing = false; 
+			player.jumpKeyPressing = false;
+			player.altJumpKeyPressing = false; 
+			player.runKeyPressing = false;
+			player.altRunKeyPressing = false;
+			player.dropItemKeyPressing = false;
+			player.pauseKeyPressing = false;
+		end
+
 		
 	end
 
