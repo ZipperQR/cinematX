@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.0e                                                      						*
+--  v0.2.0f                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
@@ -21,7 +21,7 @@ end
 
 
 textblox.textBlockRegister = {}
-textblox.textBlockGarbageQueue = {}
+--textblox.textBlockGarbageQueue = {}
 textblox.resourcePath = "..\\..\\..\\LuaScriptsLib\\textblox\\"
 
 
@@ -899,13 +899,7 @@ do
 	
 	function TextBlock:closeSelf ()
 		-- Undo game pausing
-		if  self.pauseGame == true  then	
-			--[[
-			Defines.levelFreeze = false
-			player.speedX = self.playerSpeedX
-			player.speedY = self.playerSpeedY
-			inputs.locked["all"] = false
-			--]]
+		if  self.pauseGame == true  then
 			Misc.unpause ();
 		end
 		
@@ -914,16 +908,12 @@ do
 			Audio.playSFX (self.closeSound)
 		end
 		
-		-- Add to the delete queue
-		self.deleteMe = true
+		-- Delete
+		self:delete ()
 	end
 	
 	function TextBlock:delete ()
-		if  self.index ~= -1  then
-			table.insert(textblox.textBlockGarbageQueue, self.index)
-		else
-			windowDebug ("ERROR: Trying to close a text block with an invalid index.")
-		end
+		self.deleteMe = true
 	end
 	
 	
@@ -1293,27 +1283,22 @@ do
 	function textblox.update ()
 		textblox.waveModeCycle = (textblox.waveModeCycle + 0.25)%360
 	
-		for k,v in pairs (textblox.textBlockRegister)  do
-			-- Set the key
-			v.index = k
+	
+		-- Loop through and update/delete the text blocks
+		local k = 1;
+		while  k <= #textblox.textBlockRegister  do
 			
-			-- Call the delete functions of ones marked for deletion
-			if  v.deleteMe == true  then
-				v:delete ()
-				
-			-- Otherwise, run the update function
+			local v = textblox.textBlockRegister [k]
+			if  (v.deleteMe == true)  then
+				table.remove (textblox.textBlockRegister, k);
+			
 			else
 				v:update ()
+				i = i+1;
 			end
-			
 		end
 		
-		-- Empty the garbage queue
-		for k,v in pairs (textblox.textBlockGarbageQueue)  do
-			table.remove (textblox.textBlockRegister, v)
-			table.remove (textblox.textBlockGarbageQueue, k)
-		end
-		
+		-- Run garbage collection		
 		collectgarbage("collect")
 	end	
 	
