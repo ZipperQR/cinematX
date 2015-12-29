@@ -1294,7 +1294,7 @@ do
 			
 			else
 				v:update ()
-				i = i+1;
+				k = k+1;
 			end
 		end
 		
