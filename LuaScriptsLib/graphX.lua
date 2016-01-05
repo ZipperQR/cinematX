@@ -1,5 +1,5 @@
 --graphX.lua 
---v0.3a
+--v0.3b
 --Pretty blatantly based on colliders.lua by Hoeloe
 
 local graphX = {}
@@ -49,6 +49,12 @@ local vectr = loadSharedAPI ("vectr")
 		return x1,y1;
 	end
 	
+	
+	--***************************************************************************************************
+	--                                                                                                  *
+	--              PRIMITIVE DRAWING FUNCTIONS                                                         *
+	--                                                                                                  *
+	--***************************************************************************************************
 	
 	function graphX.boxLevel (x,y,w,h, col, tex)
 		local x1,y1 = graphX.worldToScreen (x, y);
@@ -256,7 +262,8 @@ local vectr = loadSharedAPI ("vectr")
 		Graphics.glDrawTriangles (pts, {}, (#pts + 1)/2);
 		Graphics.glSetTextureRGBA (nil, 0xFFFFFFFF);
 	end
-		
+
+
 
 	function circleToTris(x,y,r)
 		local x1 = x
@@ -302,6 +309,13 @@ local vectr = loadSharedAPI ("vectr")
 	end
 
 	
+
+	--***************************************************************************************************
+	--                                                                                                  *
+	--              UI DRAWING FUNCTIONS                                                                *
+	--                                                                                                  *
+	--***************************************************************************************************
+
 	
 	graphX.MENU_FILL = Graphics.loadImage(graphX.resourcePath.."menuFillA.png")
 	graphX.BORDER_UL = Graphics.loadImage(graphX.resourcePath.."menuBorderUL.png")
@@ -344,24 +358,42 @@ local vectr = loadSharedAPI ("vectr")
 		drawMenuBorder (x,y,w,h, borderTable)
 	end
 
-	
 
+	function graphX.getDefBorderTable ()
+		local borderTable = {}
+		
+		borderTable["ulImg"] = graphX.BORDER_UL
+		borderTable["uImg"] = graphX.BORDER_U
+		borderTable["urImg"] = graphX.BORDER_UR
+		borderTable["rImg"] = graphX.BORDER_R
+		borderTable["drImg"] = graphX.BORDER_DR
+		borderTable["dImg"] = graphX.BORDER_D
+		borderTable["dlImg"] = graphX.BORDER_DL
+		borderTable["lImg"] = graphX.BORDER_L
+
+		borderTable["thick"] = 4
+		borderTable["col"] = 0xFFFFFFFF
+	
+		return borderTable
+	end
+	
 	function drawMenuBorder (x,y,w,h, borderTable)
 
 		if borderTable == nil  then
-			borderTable = {}
+			borderTable = graphX.getDefBorderTable ()
 		end
 	
-		local ulImg = borderTable["ulImg"] or graphX.BORDER_UL
-		local uImg = borderTable["uImg"] or graphX.BORDER_U
-		local urImg = borderTable["urImg"] or graphX.BORDER_UR
-		local rImg = borderTable["rImg"] or graphX.BORDER_R
-		local drImg = borderTable["drImg"] or graphX.BORDER_DR
-		local dImg = borderTable["dImg"] or graphX.BORDER_D
-		local dlImg = borderTable["dlImg"] or graphX.BORDER_DL
-		local lImg = borderTable["lImg"] or graphX.BORDER_L
+		local ulImg = borderTable["ulImg"]
+		local uImg = borderTable["uImg"]
+		local urImg = borderTable["urImg"]
+		local rImg = borderTable["rImg"]
+		local drImg = borderTable["drImg"]
+		local dImg = borderTable["dImg"]
+		local dlImg = borderTable["dlImg"]
+		local lImg = borderTable["lImg"]
 
-		local th = borderTable["thick"] or 4
+		local th = borderTable["thick"]
+		local col = borderTable["col"]
 		
 		local x1 = math.min(x,x+w)-th
 		local x2 = x
@@ -374,16 +406,16 @@ local vectr = loadSharedAPI ("vectr")
 		local y4 = y3+th
 		
 		-- Corners
-		graphX.boxScreen (x1,y1,th,th, 0xFFFFFFFF, ulImg) -- Upper-left
-		graphX.boxScreen (x3,y1,th,th, 0xFFFFFFFF, urImg) -- Upper-right
-		graphX.boxScreen (x1,y3,th,th, 0xFFFFFFFF, dlImg) -- Lower-left
-		graphX.boxScreen (x3,y3,th,th, 0xFFFFFFFF, drImg) -- Lower-right
+		graphX.boxScreen (x1,y1,th,th, col, ulImg) -- Upper-left
+		graphX.boxScreen (x3,y1,th,th, col, urImg) -- Upper-right
+		graphX.boxScreen (x1,y3,th,th, col, dlImg) -- Lower-left
+		graphX.boxScreen (x3,y3,th,th, col, drImg) -- Lower-right
 		
 		-- Edges
-		graphX.boxScreen (x1,y2,th,h, 0xFFFFFFFF, lImg) -- Left
-		graphX.boxScreen (x2,y1,w,th, 0xFFFFFFFF, uImg) -- Top
-		graphX.boxScreen (x3,y2,th,h, 0xFFFFFFFF, rImg) -- Right
-		graphX.boxScreen (x2,y3,w,th, 0xFFFFFFFF, dImg) -- Bottom
+		graphX.boxScreen (x1,y2,th,h, col, lImg) -- Left
+		graphX.boxScreen (x2,y1,w,th, col, uImg) -- Top
+		graphX.boxScreen (x3,y2,th,h, col, rImg) -- Right
+		graphX.boxScreen (x2,y3,w,th, col, dImg) -- Bottom
 		
 		--[[
 		-- Black outline
@@ -400,152 +432,6 @@ local vectr = loadSharedAPI ("vectr")
 		]]
 	end
 
-	
-	--[[
-	function graphX.polyScreen(x,y,...)
-		local arg = {...};
-		
-		local p = {x=x, y=y};
-		local ts = {};
-		
-		for _,v in ipairs(arg) do
-			if(v[1] == nil or v[2] == nil) then
-				error("Invalid polygon definition.", 2);
-			end
-			if(p.minX == nil or v[1] < p.minX) then
-				p.minX = v[1];
-			end
-			if(p.maxX == nil or v[1] > p.maxX) then
-				p.maxX = v[1];
-			end
-			if(p.minY == nil or v[2] < p.minY) then
-				p.minY = v[2];
-			end
-			if(p.maxY == nil or v[2] > p.maxY) then
-				p.maxY = v[2];
-			end
-		end
-		
-		local vlist;
-		local winding = 0;
-		
-		--Calculate winding order.
-		for k,v in ipairs(arg) do
-			local n = k+1;
-			local pr = k-1;
-			if(n > table.getn(arg)) then n = 1; end
-			if(pr <= 0) then pr = table.getn(arg); end
-			winding = winding + (v[1]+arg[n][1])*(v[2]-arg[n][2]);
-		end
-		
-		--If winding order is anticlockwise, triangulation will fail, so reverse vertex list in that case.
-		if(winding > 0) then
-			vlist = {};
-			local argn = #arg;
-			for k,v in ipairs(arg) do
-				vlist[argn - k + 1] = v;
-			end
-		else 
-			vlist = arg;
-		end
-		
-		local trilist = {};
-		
-		--Repeatedly search for and remove convex triangles (ears) from the polygon (as long as they have no other vertices inside them). When the polygon has only 3 vertices left, stop.
-		while(table.getn(vlist) > 3) do
-			local count = table.getn(vlist);
-			for k,v  in ipairs(vlist) do
-				local n = k+1;
-				local pr = k-1;
-				if(n > table.getn(vlist)) then n = 1; end
-				if(pr <= 0) then pr = table.getn(vlist); end
-				local lr = v[1] > vlist[pr][1] or v[2] > vlist[pr][2];
-				if lr then
-					lr = 1;
-				else
-					lr = -1;
-				end
-				local left = isLeft(vlist[n], vlist[pr], v);
-				if(left > 0) then
-					local t = colliders.Tri(0,0,vlist[pr],v,vlist[n]);
-					local pointin = false;
-					for k2,v2 in ipairs(vlist) do
-						if(k2 ~= k and k2 ~= n and k2 ~= pr and testTriPoint(t,v2)) then
-							pointin = true;
-							break;
-						end
-					end
-					if(not pointin) then
-						table.insert(trilist, t);
-						table.remove(vlist,k);
-						break;
-					end
-				elseif(left == 0) then
-					table.remove(vlist,k);
-					break;
-				end
-			end
-			if(table.getn(vlist) == count) then
-				error("Polygon is not simple. Please remove any edges that cross over.",2);
-			end
-		end
-		
-		--Insert the final triangle to the triangle list.
-		table.insert(trilist, colliders.Tri(0,0,vlist[1],vlist[2],vlist[3]));
-		
-		for k,v in ipairs(trilist) do
-			v.x = p.x;
-			v.y = p.y;
-		end
-		
-		p.tris = trilist;
-		
-		p.Rotate = function(obj, angle)
-			for k,v in ipairs(obj.tris) do
-				v:Rotate(angle);
-				if(v.minX < obj.minX) then obj.minX = v.minX; end
-				if(v.maxX > obj.maxX) then obj.maxX = v.maxX; end
-				if(v.minY < obj.minY) then obj.minY = v.minY; end
-				if(v.maxY > obj.maxY) then obj.maxY = v.maxY; end
-			end
-		end
-		
-		p.Translate = function(obj, x, y)
-			for k,v in ipairs(obj.tris) do
-				v:Translate(x,y);
-			end
-			obj.minX = obj.minX + x;
-			obj.maxX = obj.maxX + x;
-			obj.minY = obj.minY + y;
-			obj.maxY = obj.maxY + y;
-		end
-		
-		p.Scale = function(obj, x, y)
-			y = y or x;
-			for k,v in ipairs(obj.tris) do
-				v:Scale(x,y);
-			end
-			obj.minX = obj.minX*x;
-			obj.maxX = obj.maxX*x;
-			obj.minY = obj.minY*y;
-			obj.maxY = obj.maxY*y;
-		end
-		
-		p.Draw = function(obj, c)
-			c = c or 0x0000FF99;
-			for _,v in ipairs(obj.tris) do
-				v.x = obj.x;
-				v.y = obj.y;
-				Graphics.glSetTextureRGBA(nil, c);
-				v:Draw(c);
-			end
-		end
-		
-		setmetatable(p,createMeta(TYPE_POLY))
-		
-		return p;
-	end
-	]]
 	
 	function graphX.progressBarLevel (x,y,w,h, col, align, amt)
 		local x1,y1 = graphX.worldToScreen (x, y);

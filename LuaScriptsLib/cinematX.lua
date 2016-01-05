@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 --  cinematX.lua                                                                        *
---  v0.0.8m4                                                                            *
+--  v0.8n                                                                             *
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua                        *
 --  Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516            *
 --                                                                                      *
@@ -39,6 +39,7 @@ npcconfig = loadSharedAPI("npcconfig");
 colliders = loadSharedAPI("colliders");
 inputs = loadSharedAPI("inputs");
  
+--inputs.debug = true
  
  
 function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
@@ -358,6 +359,7 @@ do
 		thisActorObj.animState = cinematX.ANIMSTATE_IDLE
 	   
 		thisActorObj.shouldFacePlayer = false
+		thisActorObj.hasCloseAnim = true
 		thisActorObj.closeIdleAnim = cinematX.ANIMSTATE_TALK
 		thisActorObj.farIdleAnim = cinematX.ANIMSTATE_IDLE
 		thisActorObj.talkAnim = cinematX.ANIMSTATE_TALK
@@ -670,10 +672,10 @@ do
 			end
 
 			function Actor:setTalkAnimStates (closeIdle, farIdle, talk)
-			   self.farIdleAnim = farIdle
+			   self.farIdleAnim = farIdle or closeIdle
 			   self.closeIdleAnim = closeIdle
-			   self.talkAnim = talk
-			   self:setAnimState(farIdle)
+			   self.talkAnim = talk or closeIdle
+			   self:setAnimState (farIdle)
 			end
 		   
 			function Actor:getAnimState ()
@@ -741,7 +743,7 @@ do
 												   
 													if  self.isCarrying == true  then
 															self:setAnimState (cinematX.ANIMSTATE_GRAB)                                                                                                            
-													elseif (self:distanceActor (cinematX.playerActor) < 64) then
+													elseif (self:distanceActor (cinematX.playerActor) < 64)  and  self.hasCloseAnim == true  then
 															self:setAnimState (self.closeIdleAnim)
 													else
 															self:setAnimState (self.farIdleAnim)
@@ -1458,16 +1460,31 @@ do
 		end
 
 
-		-- Update hidden state and collision toggle (with other actors)
+		-- Update hidden state and collision toggle (with other actors)		
 		if  self.isHidden == true  then
 			if  self.smbxClass == "Player"  then
-				--self:setMem (0x13E, FIELD_WORD, 8)				
-				self:setMem (0x122, FIELD_WORD, 8)
+				--self:setMem (0x13E, FIELD_WORD, 8)
+				if  wasHidden == false  then
+				end
+				--self:setMem (0x122, FIELD_WORD, 8)
+				--self.smbxObjRef.x = self.smbxObjRef.x - 32
+				--self.smbxObjRef.y = self.smbxObjRef.y - 32
 			else
 		   		npcRef:mem(0xE4, FIELD_WORD, 255)
 		   		npcRef:mem(0xE8, FIELD_DFLOAT, 0)
 			end
+			
+		-- Reset status the next frame
+		elseif  self.wasHidden == true  then
+			if  self.smbxClass == "Player"  then
+				--self:setMem (0x13E, FIELD_WORD, 8)				
+				self:setMem (0x122, FIELD_WORD, 0)
+				--self.smbxObjRef.x = self.smbxObjRef.x - 32
+				--self.smbxObjRef.y = self.smbxObjRef.y - 32
+			end
 		end
+		
+		
 	   
 		if  self.actorCollisionOn == false  then
 			if  self.smbxClass == "Player"  then
@@ -1532,7 +1549,8 @@ do
 		-- Display the actor's UID variables
 		if  (cinematX.showDebugInfo == true)  then
 			printText ("UID:" .. tostring(self:getUIDMem()) .. ", " .. self.uid, 4, self:getScreenX(), self:getScreenY()-32)
-			printText (tostring(self:getAnimFrame()), 4, self:getScreenX(), self:getScreenY()-48)
+			printText (string.format("%.2f", self:getSpeedX()), 4, self:getScreenX(), self:getScreenY()-64)
+			printText (tostring(self:getMem (0x04, FIELD_WORD)), 4, self:getScreenX(), self:getScreenY()-48)
 		end
 	   
 		-- Update invincible
@@ -1829,25 +1847,40 @@ do
 	   
 		-- Update extra sprites
 		if  self.extraSprites["loaded"] == true  and  self.extraSpriteAnim ~= nil  and  next(self.extraSpriteAnim) ~= nil  then
+
+			-- Get width and height
+			local extraW = self.extraSprites["w"] / self.extraSprites["cols"]
+			local extraH = self.extraSprites["h"] / self.extraSprites["rows"]
 		   
+
+			-- Loop through the animation
 			local extraAnimLength = #self.extraSpriteAnim
 								   
 			self.extraSpriteFrame = (self.extraSpriteFrame + self.extraSpriteProps["speed"]*0.2) % extraAnimLength
 			
-			-- Looping
-			if  self.extraSpriteAnim[math.floor(self.extraSpriteAnim) + 1] < 0  then
-			
+			-- Determine the frame
 			local extraIndex = math.floor(self.extraSpriteFrame) + 1
 			local extraCol = 1
 		   
-			local extraW = self.extraSprites["w"] / self.extraSprites["cols"]
-			local extraH = self.extraSprites["h"] / self.extraSprites["rows"]
-		   
 			if  self.extraSprites["cols"] == 2  and  self:getDirection() == DIR_RIGHT  then
 				extraCol = 2
+			end		
+			
+			-- Looping
+			if  self.extraSpriteAnim [extraIndex] < 0  then
+				self.extraSpriteFrame = self.extraSpriteFrame + self.extraSpriteAnim [extraIndex]
+				 extraIndex = math.floor(self.extraSpriteFrame) + 1
 			end
+							
 		   
-			Graphics.drawImageToSceneWP (self.extraSprites["file"], self:getCenterX() - 0.5*extraW + self.extraSpriteProps["xOffset"], self:getCenterY() - 0.5*extraH + self.extraSpriteProps["yOffset"], (extraCol-1)*extraW, self.extraSpriteAnim[extraIndex]*extraH, extraW, extraH, 0.5)
+			Graphics.drawImageToSceneWP (self.extraSprites["file"], 
+										 self:getCenterX() - 0.5*extraW + self.extraSpriteProps["xOffset"], 
+										 self:getCenterY() - 0.5*extraH + self.extraSpriteProps["yOffset"], 
+										 (extraCol-1) * extraW, 
+										 self.extraSpriteAnim[extraIndex] * extraH, 
+										 extraW, 
+										 extraH, 
+										 0.5)
 		end
 	   
 	   
@@ -1864,6 +1897,11 @@ do
 				isInteractive = false
 			end
 		end
+		
+		
+		-- Save hidden and collsion off states for previous frame
+		self.wasHidden = self.isHidden
+		self.actorCollisionWasOn = self.actorCollisionOn
 	end
    
    
@@ -1926,7 +1964,6 @@ do
 end
  
  
- end                      
 
 --***************************************************************************************************
 --                                                                                                  *
@@ -2275,10 +2312,22 @@ do
  
 		-- Cutscene/Boss AI timing variables
 		cinematX.cutsceneFrame = 0
- 
+		
+		-- Coroutine to skip to
+		cinematX.skipCoroutine = nil
+		
+		-- Current cutscene
+		cinematX.currentCutscene = nil
+		
 		-- Can the entire cutscene be skipped?
-		cinematX.cutsceneSkippable = true
-
+		cinematX.cutsceneSkippable = false
+		cinematX.skipPromptString = "Hold [drop item] to skip"
+		cinematX.skippingString = "Skipping..."
+		cinematX.currentSkipString = cinematX.skipPromptString
+		cinematX.skipPromptAlpha = 2
+		cinematX.maxSkipTimer = 180
+		cinematX.skipTimer = 180
+		
 		-- Player input currently active?
 		cinematX.playerInputActive = true
 
@@ -2510,7 +2559,7 @@ do
 		cinematX.updateRace ()
 		cinematX.updateUI ()
 		cinematX.updateCheats ()
-		--cinematX.updateInput ()
+		cinematX.updateCutscene ()
 	   
 	   
 		-- Call delayed init (level)
@@ -2581,6 +2630,34 @@ do
 		--mem (cinematX.cameraYAddress, FIELD_DWORD, cinematX.cameraOffsetY)
 	end
 
+	
+	function cinematX.updateCutscene ()
+	
+		-- Skipping cutscenes
+		if  cinematX.cutsceneSkippable == true  then
+			if	inputs.state["dropitem"] == inputs.HOLD  then
+				cinematX.skipTimer = math.max(cinematX.skipTimer - 1, 0)
+				
+				cinematX.skippingString = "Skipping... "..tostring(math.max(math.ceil((3*cinematX.skipTimer)/cinematX.maxSkipTimer), 0))
+				cinematX.currentSkipString = cinematX.skippingString
+				
+				cinematX.skipPromptAlpha = math.min (cinematX.skipPromptAlpha + 0.02, 1)
+			else
+				cinematX.currentSkipString = cinematX.skipPromptString
+				cinematX.skipTimer = cinematX.maxSkipTimer
+				
+				cinematX.skipPromptAlpha = math.max (cinematX.skipPromptAlpha-0.01, 0.35)
+			end
+			
+			-- Perform skip
+			if  cinematX.skipTimer <= 0  then
+				cinematX.abortCoroutine (cinematX.currentCutscene)
+				cinematX.cutsceneSkippable = false
+				cinematX.runCutscene (cinematX.skipCoroutine)
+			end
+		end
+	end
+	
    
 	-- Process a cinematX tag from a valid NPC string
 	function cinematX.parseTagFromNPCMessage (msgStr, tagName)
@@ -2832,8 +2909,22 @@ do
 			   
 				if  (v ~= nil)  then
 					if  (v.smbxObjRef ~= nil)  then
-						if  (v:distanceActor (cinematX.playerActor) < 800   and  
-							(v.isInteractive == true  or  v.altSubString ~= nil))                          then
+						
+						-- Check if the actor's layer is hidden
+						local vHiddenLayer = false
+						
+						local vLayer = v.smbxObjRef.layerObj
+						
+						if  vLayer ~= nil  then
+							if  vLayer.isHidden == true  then
+								vHiddenLayer = true
+							end
+						end
+						
+										
+						if  (v:distanceActor (cinematX.playerActor) < 800   			and  
+							(v.isInteractive == true  or  v.altSubString ~= nil))       and
+							(vHiddenLayer == false)										then
 						   
 							-- Check interaction type and whether the player has already spoken to the NPC
 							local tempIconType = 0
@@ -2932,11 +3023,13 @@ do
 			if (cinematX.racePlayerPos >= 1) then
 				cinematX.raceActive = false
 				cinematX.runCoroutine (cinematX.raceWinRoutine)
+				cinematX.abortCoroutine (cinematX.racePathRoutine)
 			end
 		   
 			if (cinematX.raceEnemyPos >= 1) then
 				cinematX.raceActive = false
 				cinematX.runCoroutine (cinematX.raceLoseRoutine)
+				cinematX.abortCoroutine (cinematX.racePathRoutine)
 			end
 		end
 	end
@@ -2964,6 +3057,23 @@ do
 		local playerWarpTimer = player:mem (0x15C, FIELD_WORD)
 		local playerWarpType = player:mem (0x5A, FIELD_WORD)
 	   
+		--[[
+		local warpExitId = v:mem (0x15E, FIELD_WORD)
+		local warpEnterId = nil
+		local warpEnterObj = nil
+		
+		
+		if  playerForcedAnimState == 3  then
+			warpEnterId = pipeWarpEnter[v]
+			warpEnterObj = Warp.getIntersectingEntrance (centerX-24,bottomY-hitboxBigH-8, centerX+24,v.y+hitboxBigH+8)[1]
+		else
+			warpEnterId = v:mem (0x5A, FIELD_WORD)
+			warpEnterObj = Warp.get()[warpEnterId]
+			pipeWarpEnter[v] = warpEnterId
+		end
+		--]]
+	   
+	   
 		cinematX.playerWarpingPrev = cinematX.playerWarping
 		cinematX.playerWarping = false
 	   
@@ -2977,7 +3087,8 @@ do
 				   
 					-- Pipe
 					if  playerForcedAnimState == 3  then
-						cinematX.warpFade (0.8)
+						cinematX.fadeScreenOut (0.5)
+						--cinematX.screenTransitionAmt = 0.5
 				   
 					-- Door
 					else
@@ -3011,7 +3122,6 @@ do
 			cinematX.letterboxAlphaMult = math.max(0, cinematX.letterboxAlphaMult - cinematX.letterboxAlphaRate)
 		end
 		cinematX.letterboxAlphaHex =    lerp(0x00000000, 0x000000FF, cinematX.letterboxAlphaMax * cinematX.letterboxAlphaMult)
-	   
 	   
 			   
 	   
@@ -3081,6 +3191,11 @@ do
 		end
 	   
 	   
+		-- SKIP CUTSCENE PROMPT
+		if  cinematX.cutsceneSkippable == true  then
+			cinematX.printLeftText (cinematX.currentSkipString, 4, 20, 20, cinematX.skipPromptAlpha)
+		end
+	   
 	   
 		-- RACE PROGRESS
 		if   cinematX.currentSceneState == cinematX.SCENESTATE_RACE   then
@@ -3090,8 +3205,8 @@ do
 			local raceEnemyIconX = lerp (raceMeterLeft, raceMeterRight, cinematX.raceEnemyPos)
 			local barY = 520
 
-			Graphics.drawImageWP (cinematX.IMGREF_RACEFLAGSTART,    raceMeterLeft,          barY,  3.494)
-			Graphics.drawImageWP (cinematX.IMGREF_RACEFLAGEND,              raceMeterRight,         barY,  3.494)
+			Graphics.drawImageWP (cinematX.IMGREF_RACEFLAGSTART,    	raceMeterLeft,          barY,  3.494)
+			Graphics.drawImageWP (cinematX.IMGREF_RACEFLAGEND,      	raceMeterRight,         barY,  3.494)
 
 		   
 			if (racePlayerIconX > raceEnemyIconX)  then
@@ -3190,7 +3305,7 @@ do
 					textblox.print (tempBottomLine, 400, 555, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, 999, 1)
 
 				elseif   (cinematX.thisDialogAutoEnd == false  and  cinematX.dialogTextTime <= 0  and  cinematX.subtitleBoxBlock:getFinished() == true  and  cinematX.dialogSetting_showThisPrompt == true)   then
-					textblox.print ("(PRESS X TO CONTINUE)", 800-8, 580, cinematX.subtitleFont, textblox.HALIGN_RIGHT, textblox.HALIGN_TOP, 999, 1)
+					textblox.print ("(PRESS [RUN] TO CONTINUE)", 800-8, 580, cinematX.subtitleFont, textblox.HALIGN_RIGHT, textblox.HALIGN_TOP, 999, 1)
 				end
 			   
 			else
@@ -3218,7 +3333,7 @@ do
 					Text.printWP (string.sub (cinematX.dialogText, 129, 171), 4, 15, 555, 3.495)
 				   
 					if   (cinematX.thisDialogAutoEnd == false  and  cinematX.dialogTextTime <= 0  and  cinematX.dialogSetting_showThisPrompt)   then
-						Text.printWP ("(PRESS X TO CONTINUE)", 4, 400, 580, 3.495)
+						Text.printWP ("(PRESS [RUN] TO CONTINUE)", 4, 400, 580, 3.495)
 					end
 
 				end                    
@@ -3630,9 +3745,11 @@ do
 
 
 		-- Re-enable input
-		for k,v in pairs(inputs.state) do
-			inputs.locked[k] = false
-		   
+		inputs.locked["all"] = false
+
+		
+		-- Call input signals
+		for k,v in pairs(inputs.state) do		   
 			if  v == inputs.PRESS  then  
 				cinematX.signal ("keyPress"..k)
 			end
@@ -3646,10 +3763,8 @@ do
 		-- Disable the player's inputs when in a cutscene
 		if  (cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   and   cinematX.freezeDuringCutscenes == true)  or  (cinematX.freezePlayer == true)  then
 			   
-			for k,v in pairs(inputs.locked) do
-				inputs.locked[k] = true
-			end
-		   
+			inputs.locked["all"] = true
+			
 			--[[
 			player.upKeyPressing = false
 			player.downKeyPressing = false
@@ -3811,8 +3926,23 @@ do
 		end
 	end
 	
-	function cinematX.stopCoroutine (func)
-		--does nothing at the moment
+	function cinematX.abortCoroutine (func)
+		eventu.abort (func)
+		
+		-- change scene state
+		if  cinematX.currentSceneState == SCENESTATE_CUTSCENE  then
+			cinematX.endCutscene ()
+		end
+		
+		-- Abort dialog
+		if  cinematX.dialogOn == true  then
+			cinematX.endDialogLine ()
+		end
+	end
+	 
+	function cinematX.setSkipScene (func)
+		cinematX.cutsceneSkippable = true
+		cinematX.skipCoroutine = func
 	end
 	 
 	
@@ -4378,8 +4508,11 @@ do
 	   
 		-- Call the coroutine or cutscene
 		if      (thisActor.sceneString ~= nil)   then
+			--if  LUNALUA_VER >=   then
+			--else
 			tempFunctStr = thisActor.sceneString
-			tempFunctA = loadstring ("return __lunalocal."..tempFunctStr)
+			--tempFunctA = loadstring ("return __lunalocal."..tempFunctStr)
+			tempFunctA = loadstring ("return UserCodeManager.getCodeFile("..'"lunadll"'..").instance."..tempFunctStr)
 			tempFunctB = tempFunctA ()
 			--windowDebug (tempFunctStr .. " " .. type(tempFunctB))
 			cinematX.runCutscene (tempFunctB)
@@ -4388,7 +4521,8 @@ do
 		   
 		elseif  (thisActor.routineString ~= nil) then
 			tempFunctStr = thisActor.routineString
-			tempFunctA = loadstring ("return __lunalocal."..tempFunctStr)
+			--tempFunctA = loadstring ("return __lunalocal."..tempFunctStr)
+			tempFunctA = loadstring ("return UserCodeManager.getCodeFile("..'"lunadll"'..").instance."..tempFunctStr)
 			tempFunctB = tempFunctA ()
 			--windowDebug (tempFunctStr .. " " .. type(tempFunctB))
 			cinematX.runCoroutine (tempFunctB)
@@ -4435,15 +4569,35 @@ do
 	end
    
    
-	function cinematX.printCenteredText (text, font, xPos, yPos)
+	function cinematX.printCenteredText (text, font, xPos, yPos, alpha)
+		if  alpha == nil  then
+			alpha = 1
+		end
+	
 		if text ~= nil then
 			if  cinematX.textbloxSubtitle == true  then
-				textblox.print (text, xPos, yPos, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, 999, 1)
+				textblox.print (text, xPos, yPos, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, 999, alpha)
 			else
 				Text.printWP (text, font, xPos-9 * string.len(text), yPos, 3.495)
 			end
 		end
 	end
+	
+   
+	function cinematX.printLeftText (text, font, xPos, yPos, alpha)
+		if  alpha == nil  then
+			alpha = 1
+		end
+	
+		if text ~= nil then
+			if  cinematX.textbloxSubtitle == true  then
+				textblox.print (text, xPos, yPos, cinematX.subtitleFont, textblox.HALIGN_LEFT, textblox.HALIGN_TOP, 999, alpha)
+			else
+				Text.printWP (text, font, xPos, yPos, 3.495)
+			end
+		end
+	end	
+
 end
  
  
@@ -4455,7 +4609,7 @@ end
 --***************************************************************************************************
  
 do
-	function cinematX.beginRace (otherActor, startX, endX, raceFunc, loseFunc, winFunc)
+	function cinematX.beginRace (otherActor, startX, endX, raceAIFunc, loseFunc, winFunc)
 	   
 		cinematX.raceEnemyActor = otherActor
 		cinematX.raceStartX = startX
@@ -4468,7 +4622,8 @@ do
 		cinematX.refreshHUDOverlay ()
 		cinematX.raceActive = true
 	   
-		cinematX.runCoroutine (raceFunc)
+		cinematX.racePathRoutine = cinematX.runCoroutine (raceAIFunc)
+		return  cinematX.racePathRoutine
 	end
    
    
@@ -4726,15 +4881,17 @@ do
 		--cinematX.enterCameraMode ()
 		cinematX.refreshHUDOverlay ()
 	   
-		return cinematX.runCoroutine (func)
+		cinematX.currentCutscene = cinematX.runCoroutine (func)
+		return cinematX.currentCutscene
 	end
 		   
 	function cinematX.endCutscene ()
 		cinematX.changeSceneMode (cinematX.SCENESTATE_PLAY)
 		if  (cinematX.playerActor.shouldWalkToDest == true)  then
-				cinematX.playerActor:walk(0)
+			cinematX.playerActor:walk (0)
 		end
 			   
+		cinematX.currentCutscene = nil
 		--cinematX.exitCameraMode ()
 	end
    
@@ -4820,8 +4977,8 @@ do
 	cinematX.changeSection_newSect = 0
    
 	function cinematX.changeSection (newSection, outSeconds, inSeconds)
-		cinematX.changeSection_outTime = outSeconds or 1
-		cinematX.changeSection_inTime = inSeconds or 1
+		cinematX.changeSection_outTime = outSeconds or 0
+		cinematX.changeSection_inTime = inSeconds or 0
 		cinematX.changeSection_newSect = newSection or 1
 
 		cinematX.runCoroutine (cinematX.cor_changeSection)
@@ -4833,12 +4990,15 @@ do
 		local outTime = cinematX.changeSection_outTime
 		local newSect = cinematX.changeSection_newSect
 	   
-		cinematX.fadeScreenOut (outTime)
-		cinematX.waitSeconds (outTime)
-	   
+		if  outTime > 0  then
+			cinematX.fadeScreenOut (outTime)
+			cinematX.waitSeconds (outTime)
+		end
 		player:mem (0x15A, FIELD_WORD, newSect)
-	   
-		cinematX.fadeScreenIn (inTime)
+		
+		if  inTime > 0  then
+			cinematX.fadeScreenIn (inTime)
+		end
 	end
    
 		   
@@ -4861,15 +5021,15 @@ do
    
 		   
 	function cinematX.fadeScreenOut (seconds)
-		--cinematX.stopCoroutine (cinematX.cor_fadeOut)
-		--cinematX.stopCoroutine (cinematX.cor_fadeIn)
+		--cinematX.abortCoroutine (cinematX.cor_fadeOut)
+		--cinematX.abortCoroutine (cinematX.cor_fadeIn)
 		cinematX.screenTransitionTime = seconds or 1
 		cinematX.runCoroutine (cinematX.cor_fadeOut)
 	end
 
 	function cinematX.fadeScreenIn (seconds)
-		--cinematX.stopCoroutine (cinematX.cor_fadeOut)
-		--cinematX.stopCoroutine (cinematX.cor_fadeIn)
+		--cinematX.abortCoroutine (cinematX.cor_fadeOut)
+		--cinematX.abortCoroutine (cinematX.cor_fadeIn)
 		cinematX.screenTransitionTime = seconds or 1
 		cinematX.runCoroutine (cinematX.cor_fadeIn)
 	end

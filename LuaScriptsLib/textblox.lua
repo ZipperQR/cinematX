@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.0f                                                      						*
+--  v0.2.0g                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
@@ -39,19 +39,17 @@ textblox.currentMessage = nil
 --                                                                                                  *
 --***************************************************************************************************
 
-	--[[
-	function textblox.getImagePath (filename)		
+	function textblox.getPath (filename)		
 		--windowDebug ("TEST")
 		
-		local localImagePath = Misc.resolveFile (filename)  
+		local localPath = Misc.resolveFile (filename)  
 						
-		if  localImagePath  ~=  nil  then
-			return localImagePath
+		if  localPath  ~=  nil  then
+			return localPath
 		end
 		
 		return textblox.resourcePath..filename
 	end
-	--]]
 
 
 
@@ -181,258 +179,59 @@ do
 		
 	function Font:drawTris ()
 		--graphX.
-	end
-	
-
-	function textblox.getStringWidth (text, font)
-		local strLen = text:len() 
-		return  (strLen * font.charWidth) + (math.max(0, strLen-1) * font.kerning)
-	end
-	
-	
-	function textblox.printExt (text, properties)
-		--if  properties ~= nil  then
-	end
-	
-	
-	function textblox.print (text, x,y, font, halign, valign, width, opacity)
-		-- Setup
-		local lineBreaks = 0
-		local charsOnLine = 0
-		local totalShownChars = 0
-		local currentLineWidth = 0
-		
-		if  font == nil  then
-			font = textblox.FONT_DEFAULT
-		end
-		if  width == nil  then
-			width = math.huge
-		end
-			
-		local totalWidth = 1
-		local totalHeight = 1
-		
-		local alpha = opacity or 1.00
-		
-		local startOfLine = 1
-		local fullLineWidth = 0
-		local charEndWidth = 0
-		local markupCount = 0
-		local i = 1
-		
-		local t_halign = halign or textblox.HALIGN_LEFT
-		local t_valign = valign or textblox.VALIGN_TOP
-		
-		local topmostY = 10000
-		local leftmostX = 10000
-		
-		-- Effects
-		local shakeMode = false
-		local waveMode = false
-		local currentColor = 0xFFFFFFFF
-		
-		
-		-- Determine number of characters per line
-		local numCharsPerLine = math.floor((width)/(font.charWidth + font.kerning))
-		local mostCharsLine = 0
-		
-		
-		-- Positioning loop
-		local lineWidths = {}
-		local totalLineBreaks = 0
-		
-		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
-		
-			-- Is a command
-			if  string.find(textChunk, "<.*>") ~= nil  then
-				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
-				if  commandStr == nil  then
-					commandStr = string.match (textChunk, "[^<>%s]+")
-				end
-								
-				-- Line break
-				if  commandStr == "br"  then
-					lineWidths [lineBreaks] = charsOnLine*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
-					lineBreaks = lineBreaks + 1
-					totalLineBreaks = totalLineBreaks + 1
-					charsOnLine = 0
-				end
-		
-			-- Is plaintext
-			else
-				string.gsub (textChunk, ".", function(c)
-					-- Increment position counters
-					charsOnLine = charsOnLine + 1
-					totalShownChars = totalShownChars + 1
-
-					
-					if  charsOnLine > numCharsPerLine + 1  then
-						lineWidths[lineBreaks] = (charsOnLine-1)*font.charWidth + math.max(0, charsOnLine-2)*font.kerning
-						lineBreaks = lineBreaks + 1
-						totalLineBreaks = totalLineBreaks + 1
-						charsOnLine = 0
-					end
-					
-					-- Get widest line
-					if  mostCharsLine < charsOnLine then
-						mostCharsLine = charsOnLine
-					end
-
-					return c
-				end)
-			end
-		end
-		lineWidths[lineBreaks] = (charsOnLine)*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
-
-		
-		-- Display loop
-		lineBreaks = 0
-		charsOnLine = 0
-		
-		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
-			
-			-- Is a command
-			if  string.find(textChunk, "<.*>") ~= nil  then
-				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
-				if  commandStr == nil  then
-					commandStr = string.match (textChunk, "[^<>%s]+")
-				end
-				
-				--[[
-				if  commandStr ~= nil  then
-					if  amountStr ~= nil then
-						Text.windowDebug (commandStr..", "..tostring(amountStr))
-					else
-						Text.windowDebug (commandStr)
-					end
-				end
-				]]
-				
-				-- Line break
-				if  commandStr == "br"  then
-					lineBreaks = lineBreaks + 1
-					charsOnLine = 0
-				end
-				
-				-- Shake text
-				if  commandStr == "tremble"  then
-					shakeMode = true
-				end
-				if  commandStr == "/tremble"  then
-					shakeMode = false
-				end
-				
-				-- Wave text
-				if  commandStr == "wave"  then
-					waveMode = true
-				end
-				if  commandStr == "/wave"  then
-					waveMode = false
-				end
-			
-				-- Colored text
-				if  commandStr == "color"  then
-					currentColor = tonumber(amountStr)
-				end
-				
-				
-			-- Is plaintext
-			else
-				string.gsub (textChunk, ".", function(c)
-					
-					-- Increment position counters
-					charsOnLine = charsOnLine + 1
-					totalShownChars = totalShownChars + 1
-
-					
-					if  charsOnLine > numCharsPerLine + 1  then
-						lineBreaks = lineBreaks + 1
-						charsOnLine = 0
-					end
-					
-					-- Get widest line
-					if  mostCharsLine < charsOnLine then
-						mostCharsLine = charsOnLine
-					end
-
-					-- Ignore spaces
-					if  c ~= " " then
-
-						-- Determine position
-						currentLineWidth = math.max(0, charsOnLine-1) * font.charWidth    +   math.max(0, charsOnLine-2) * font.kerning
-						local xPos = x + currentLineWidth
-						local yPos = y + font.charHeight*lineBreaks
-						
-						
-						-- if different alignments, change those values
-						if	t_halign == textblox.HALIGN_RIGHT  then
-							xPos = x - lineWidths[lineBreaks] + currentLineWidth
-
-						elseif	t_halign == textblox.HALIGN_MID  then
-							xPos = x - 0.5*(lineWidths[lineBreaks]) + currentLineWidth
-						end
-
-
-						if	t_valign == textblox.VALIGN_BOTTOM  then
-							yPos = y + (lineBreaks - totalLineBreaks - 1)*font.charHeight
-
-						elseif t_valign == textblox.VALIGN_MID  then
-							yPos = y + (lineBreaks*font.charHeight)	- ((totalLineBreaks+1)*font.charHeight*0.5)
-						end
-
-						
-						-- Process visual effects
-						local xAffected = xPos
-						local yAffected = yPos
-											
-						if  waveMode == true  then
-							yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)
-						end
-						
-						if  shakeMode == true  then
-							local shakeX = math.max(0.5, font.charWidth * 0.125)
-							local shakeY = math.max(0.5, font.charHeight * 0.125)
-							
-							xAffected = xAffected + math.random(-1*shakeX, shakeX)
-							yAffected = yAffected + math.random(-1*shakeY, shakeY)
-						end
-						
-						-- Finally, draw the image
-						font:drawCharImage (c, xAffected, yAffected, alpha)
-					end
-					
-					return c
-				end)
-			end
-			--windowDebug (textChunk)
-		end
-		
-		totalWidth = mostCharsLine * (font.kerning + font.charWidth) - font.kerning
-		totalHeight = font.charHeight * lineBreaks
-		
-		return totalWidth, totalHeight, lineBreaks, lineWidths
-	end
-	
+	end	
 end
 
 
 --***************************************************************************************************
 --                                                                                                  *
---              DEFAULT FONTS															    		*
+--              DEFAULT FONTS AND RESOURCES												    		*
 --                                                                                                  *
 --***************************************************************************************************
 
 do 
 	textblox.FONT_DEFAULT = Font.create (textblox.FONTTYPE_DEFAULT, 4)  
 
-	--textblox.IMGNAME_DEFAULTSPRITEFONT = textblox.getImagePath ("font_default.png")
-	--textblox.IMGNAME_DEFAULTSPRITEFONTX2 = textblox.getImagePath ("font_default_x2.png")
+	textblox.IMGNAME_DEFAULTSPRITEFONT 		= textblox.getPath ("font_default.png")
+	textblox.IMGNAME_DEFAULTSPRITEFONTX2 	= textblox.getPath ("font_default_x2.png")
+	textblox.IMGNAME_DEFAULTSPRITEFONT2 	= textblox.getPath ("font_default2.png")
+	textblox.IMGNAME_DEFAULTSPRITEFONT2X2 	= textblox.getPath ("font_default2_x2.png")
+	textblox.IMGNAME_DEFAULTSPRITEFONT3 	= textblox.getPath ("font_default3.png")
+	textblox.IMGNAME_DEFAULTSPRITEFONT3X2 	= textblox.getPath ("font_default3_x2.png")
 
-	--textblox.IMGREF_DEFAULTSPRITEFONT = Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT)
-	--textblox.IMGREF_DEFAULTSPRITEFONTX2 = Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONTX2)
+	textblox.IMGNAME_BUBBLE_BORDER_U 		= textblox.getPath ("bubbleBorderU.png")
+	textblox.IMGNAME_BUBBLE_BORDER_D 		= textblox.getPath ("bubbleBorderD.png")
+	textblox.IMGNAME_BUBBLE_BORDER_L 		= textblox.getPath ("bubbleBorderL.png")
+	textblox.IMGNAME_BUBBLE_BORDER_R 		= textblox.getPath ("bubbleBorderR.png")
+	textblox.IMGNAME_BUBBLE_BORDER_UL 		= textblox.getPath ("bubbleBorderUL.png")
+	textblox.IMGNAME_BUBBLE_BORDER_UR 		= textblox.getPath ("bubbleBorderUR.png")
+	textblox.IMGNAME_BUBBLE_BORDER_DL 		= textblox.getPath ("bubbleBorderDL.png")
+	textblox.IMGNAME_BUBBLE_BORDER_DR 		= textblox.getPath ("bubbleBorderDR.png")
+
+
+	textblox.IMGREF_DEFAULTSPRITEFONT 		= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT)
+	textblox.IMGREF_DEFAULTSPRITEFONTX2 	= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONTX2)
+	textblox.IMGREF_DEFAULTSPRITEFONT2 		= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT2)
+	textblox.IMGREF_DEFAULTSPRITEFONT2X2 	= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT2X2)
+	textblox.IMGREF_DEFAULTSPRITEFONT3		= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT3)
+	textblox.IMGREF_DEFAULTSPRITEFONT3X2	= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT3X2)
 	
-	--textblox.FONT_SPRITEDEFAULT = Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 8, charHeight = 8, image = IMGREF_DEFAULTSPRITEFONT, kerning = 0})
-	--textblox.FONT_SPRITEDEFAULTX2 = Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 8, charHeight = 8, image = IMGREF_DEFAULTSPRITEFONTX2, kerning = 0})
+	textblox.IMGREF_BUBBLE_BORDER_U  		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_U)
+	textblox.IMGREF_BUBBLE_BORDER_D 		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_D)
+	textblox.IMGREF_BUBBLE_BORDER_L 		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_L)
+	textblox.IMGREF_BUBBLE_BORDER_R		 	= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_R)
+	textblox.IMGREF_BUBBLE_BORDER_UL 		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_UL)
+	textblox.IMGREF_BUBBLE_BORDER_UR	 	= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_UR)
+	textblox.IMGREF_BUBBLE_BORDER_DL 		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_DL)
+	textblox.IMGREF_BUBBLE_BORDER_DR	 	= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_DR)
+	
+	
+	textblox.FONT_SPRITEDEFAULT 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 8, 	charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT, 		kerning = 0})
+	textblox.FONT_SPRITEDEFAULTX2 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONTX2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT2 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 8, 	charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT2X2 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2X2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT3 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 9, 	charHeight = 9, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT3X2 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 18, 	charHeight = 18, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3X2, 	kerning = -2})
 end
 
 
@@ -483,7 +282,33 @@ do
 		thisTextBlock.boxType = properties["boxType"] or textblox.BOXTYPE_MENU
 		thisTextBlock.boxTex = properties["boxTex"]
 		thisTextBlock.boxColor = properties["boxColor"] or 0x00AA0099 			-- transparent green
-		thisTextBlock.borderColor = properties["borderColor"] or 0xFFFFFFFF 			-- solid white
+		thisTextBlock.borderTable = properties["borderTable"]
+		
+		
+		if  thisTextBlock.borderTable == nil  then
+		
+			if  		thisTextBlock.boxType == textblox.BOXTYPE_MENU  then
+				thisTextBlock.borderTable = graphX.getDefBorderTable ()
+				
+				thisTextBlock.borderTable["thick"] = 8
+				thisTextBlock.borderTable["col"] = 0xFF9900FF
+			
+			elseif  	thisTextBlock.boxType == textblox.BOXTYPE_WORDBUBBLE  then
+				thisTextBlock.borderTable = {}
+				thisTextBlock.borderTable["ulImg"] 	= textblox.IMGREF_BUBBLE_BORDER_UL
+				thisTextBlock.borderTable["uImg"] 	= textblox.IMGREF_BUBBLE_BORDER_U
+				thisTextBlock.borderTable["urImg"] 	= textblox.IMGREF_BUBBLE_BORDER_UR
+				thisTextBlock.borderTable["rImg"] 	= textblox.IMGREF_BUBBLE_BORDER_R
+				thisTextBlock.borderTable["drImg"] 	= textblox.IMGREF_BUBBLE_BORDER_DR
+				thisTextBlock.borderTable["dImg"] 	= textblox.IMGREF_BUBBLE_BORDER_D
+				thisTextBlock.borderTable["dlImg"] 	= textblox.IMGREF_BUBBLE_BORDER_DL
+				thisTextBlock.borderTable["lImg"] 	= textblox.IMGREF_BUBBLE_BORDER_L
+				
+				thisTextBlock.borderTable["thick"] = 8
+				thisTextBlock.borderTable["col"] = 0xFFFFFFFF
+			end
+		end
+		
 		
 		thisTextBlock.scaleMode = properties["scaleMode"]
 		if  thisTextBlock.scaleMode == nil  then
@@ -538,13 +363,16 @@ do
 		thisTextBlock.closeSound = properties["closeSound"] or ""
 		
 		if  (thisTextBlock.startSound ~= "")  then
-			Audio.playSFX (thisTextBlock.startSound)
+			Audio.playSFX (textblox.getPath (thisTextBlock.startSound))
 		end
 		
 		thisTextBlock.typeSoundChunks = {}
-		for  k,v in pairs (thisTextBlock.typeSounds)  do
-			thisTextBlock.typeSoundChunks[k] = Audio.sfxOpen (v)
+		if  #thisTextBlock.typeSounds > 0  then
+			for  k,v in pairs (thisTextBlock.typeSounds)  do
+				thisTextBlock.typeSoundChunks[k] = Audio.SfxOpen (textblox.getPath (v))
+			end
 		end
+		thisTextBlock.typeUsedChannel = 12
 		
 		
 		thisTextBlock.font = properties["font"] or textblox.FONT_DEFAULT
@@ -573,6 +401,7 @@ do
 		
 		thisTextBlock.updatingChars = true
 		thisTextBlock.finished = false
+		thisTextBlock.finishSoundPlayed = false
 		thisTextBlock.deleteMe = false
 		thisTextBlock.index = -1
 		
@@ -707,20 +536,20 @@ do
 
 		
 		
-		-- Draw box
+		-- Draw box		
 		if  self.boxType == textblox.BOXTYPE_MENU  then
 			if  self.bind == textblox.BIND_SCREEN  then
 				graphX.menuBoxScreen (boxX-self.xMargin,
 									  boxY-self.yMargin,
 									  boxWidth + 2*self.xMargin, 
 									  boxHeight + 2*self.yMargin,
-									  self.boxColor)
+									  self.boxColor, self.boxTex, self.borderTable)
 			else
 				graphX.menuBoxLevel  (boxX-self.xMargin,
 									  boxY-self.yMargin,
 									  boxWidth + 2*self.xMargin, 
 									  boxHeight + 2*self.yMargin,
-									  self.boxColor)
+									  self.boxColor, self.boxTex, self.borderTable)
 			end
 		end
 		
@@ -769,6 +598,7 @@ do
 		self:setText (textStr)
 		self.charsShown = 0
 		self.finished = false
+		self.finishSoundPlayed = false
 		self.updatingChars = true
 		self.pauseFrames = -1
 		self.speed = self.defaultSpeed
@@ -861,8 +691,9 @@ do
 
 	
 	function TextBlock:playTypeSound ()
-		if  Audio.SfxIsPlaying(18) == false  and  self.typeSounds ~= {}  then
-			Audio.SfxPlayCh (18, self.typeSoundChunks [math.random( #self.typeSounds )], 0)
+		if  Audio.SfxIsPlaying(self.typeUsedChannel) == 0  and  #self.typeSounds > 0  then
+			local sndIndex = math.random( #self.typeSounds )
+			self.typeUsedChannel = Audio.SfxPlayCh (-1, self.typeSoundChunks [sndIndex], 0)
 		end
 	end
 	
@@ -876,18 +707,23 @@ do
 		return 	self.finished
 	end
 	
+	function TextBlock:playFinishSound ()
+		if  self.finishSoundPlayed == false  then
+			self.finishSoundPlayed = true
+			if  (self.finishSound ~= "")  then
+				Audio.playSFX (textblox.getPath (self.finishSound))
+			end
+		end
+	end
+	
 	function TextBlock:finish ()
 		self.pauseFrames = -1
 		self.shakeFrames = 0
 		self.charsShown = self:getLength()
 		self.updatingChars = false
 		self.finished = true
-		
-		if  (self.finishSound ~= "")  then
-			Audio.playSFX (self.finishSound)
-		end
-
-		
+	
+		self:playFinishSound ()	
 		self:onFinish ()
 	end
 	
@@ -905,7 +741,7 @@ do
 		
 		-- Play close sound
 		if  (self.closeSound ~= "")  then
-			Audio.playSFX (self.closeSound)
+			Audio.playSFX (textblox.getPath (self.closeSound))
 		end
 		
 		-- Delete
@@ -963,6 +799,7 @@ do
 				-- If hasn't started finishing, stop updating the characters and pause for the finish delay
 				if  self.updatingChars == true  then
 					self.updatingChars = false
+					self:playFinishSound ()
 					self.pauseFrames = self.finishDelay
 				
 				-- Once the finish delay is done, finish the block
@@ -977,7 +814,8 @@ do
 				local text = self:getTextWrapped ()
 				
 				local currentChar = text:sub (self.charsShown, self.charsShown)
-				if (currentChar:match("%W") == false) then
+				if (self:getFinished() == false  and  self.charsShown < self:getLength ()  --[[and  currentChar:match("%w") == true]]) then
+					--Text.print(currentChar, 4, 20, 100)
 					self:playTypeSound ()
 				end
 				
@@ -1054,7 +892,7 @@ do
 								local sound = Misc.resolveFile (commandArgs)
 								
 								if sound ~= nil  then
-									Audio.playSFX (sound)
+									Audio.playSFX (textblox.getPath (sound))
 								end
 							end
 							
@@ -1270,6 +1108,259 @@ do
 end
 
 
+
+--***************************************************************************************************
+--                                                                                                  *
+--              PRINT FUNCTIONS																	    *
+--                                                                                                  *
+--***************************************************************************************************
+
+do
+	function textblox.getStringWidth (text, font)
+		local strLen = text:len() 
+		return  (strLen * font.charWidth) + (math.max(0, strLen-1) * font.kerning)
+	end
+	
+	
+	function textblox.print (text, xPos,yPos, fontObj, t_halign, t_valign, w, alpha)
+		return textblox.printExt (text, {x=xPos, y=yPos, font=fontObj, halign=t_halign, valign=t_valign, width, opacity=alpha})
+	end
+	
+	
+	function textblox.printExt (text, properties)
+		-- Setup
+		local x = properties["x"] or 400
+		local y = properties["y"] or 300
+		
+		local bind = properties["bind"] or textblox.BIND_SCREEN
+		
+		if  bind == textblox.BIND_LEVEL  then
+			x,y = graphX.worldToScreen(x,y)
+		end
+		
+		local t_halign = properties["halign"] or textblox.HALIGN_LEFT
+		local t_valign = properties["valign"] or textblox.VALIGN_TOP
+		local alpha = properties["opacity"] or 1.00
+		
+		local font = properties["font"] or textblox.FONT_DEFAULT
+		local width = properties["width"] or math.huge
+		
+		
+		local lineBreaks = 0
+		local charsOnLine = 0
+		local totalShownChars = 0
+		local currentLineWidth = 0
+		
+			
+		local totalWidth = 1
+		local totalHeight = 1
+		
+		
+		local startOfLine = 1
+		local fullLineWidth = 0
+		local charEndWidth = 0
+		local markupCount = 0
+		local i = 1
+				
+		local topmostY = 10000
+		local leftmostX = 10000
+		
+		-- Effects
+		local shakeMode = false
+		local waveMode = false
+		local currentColor = 0xFFFFFFFF
+		
+		
+		-- Determine number of characters per line
+		local numCharsPerLine = math.floor((width)/(font.charWidth + font.kerning))
+		local mostCharsLine = 0
+		
+		
+		-- Positioning loop
+		local lineWidths = {}
+		local totalLineBreaks = 0
+		
+		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
+		
+			-- Is a command
+			if  string.find(textChunk, "<.*>") ~= nil  then
+				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
+				if  commandStr == nil  then
+					commandStr = string.match (textChunk, "[^<>%s]+")
+				end
+								
+				-- Line break
+				if  commandStr == "br"  then
+					lineWidths [lineBreaks] = charsOnLine*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
+					lineBreaks = lineBreaks + 1
+					totalLineBreaks = totalLineBreaks + 1
+					charsOnLine = 0
+				end
+		
+			-- Is plaintext
+			else
+				string.gsub (textChunk, ".", function(c)
+					-- Increment position counters
+					charsOnLine = charsOnLine + 1
+					totalShownChars = totalShownChars + 1
+
+					
+					if  charsOnLine > numCharsPerLine + 1  then
+						lineWidths[lineBreaks] = (charsOnLine-1)*font.charWidth + math.max(0, charsOnLine-2)*font.kerning
+						lineBreaks = lineBreaks + 1
+						totalLineBreaks = totalLineBreaks + 1
+						charsOnLine = 0
+					end
+					
+					-- Get widest line
+					if  mostCharsLine < charsOnLine then
+						mostCharsLine = charsOnLine
+					end
+
+					return c
+				end)
+			end
+		end
+		lineWidths[lineBreaks] = (charsOnLine)*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
+
+		-- fix spacing issue on single-line prints
+		--if  totalLineBreaks == 0  then
+			mostCharsLine = mostCharsLine + 1
+			--lineWidths[0] = lineWidths[0] + font.charWidth + font.kerning
+		--end
+		
+		
+		-- Display loop
+		lineBreaks = 0
+		charsOnLine = 0
+		
+		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
+			
+			-- Is a command
+			if  string.find(textChunk, "<.*>") ~= nil  then
+				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
+				if  commandStr == nil  then
+					commandStr = string.match (textChunk, "[^<>%s]+")
+				end
+				
+				--[[
+				if  commandStr ~= nil  then
+					if  amountStr ~= nil then
+						Text.windowDebug (commandStr..", "..tostring(amountStr))
+					else
+						Text.windowDebug (commandStr)
+					end
+				end
+				]]
+				
+				-- Line break
+				if  commandStr == "br"  then
+					lineBreaks = lineBreaks + 1
+					charsOnLine = 0
+				end
+				
+				-- Shake text
+				if  commandStr == "tremble"  then
+					shakeMode = true
+				end
+				if  commandStr == "/tremble"  then
+					shakeMode = false
+				end
+				
+				-- Wave text
+				if  commandStr == "wave"  then
+					waveMode = true
+				end
+				if  commandStr == "/wave"  then
+					waveMode = false
+				end
+			
+				-- Colored text
+				if  commandStr == "color"  then
+					currentColor = tonumber(amountStr)
+				end
+				
+				
+			-- Is plaintext
+			else
+				string.gsub (textChunk, ".", function(c)
+					
+					-- Increment position counters
+					charsOnLine = charsOnLine + 1
+					totalShownChars = totalShownChars + 1
+
+					
+					if  charsOnLine > numCharsPerLine + 1  then
+						lineBreaks = lineBreaks + 1
+						charsOnLine = 0
+					end
+					
+					-- Get widest line
+					if  mostCharsLine < charsOnLine then
+						mostCharsLine = charsOnLine
+					end
+
+					-- Ignore spaces
+					if  c ~= " " then
+
+						-- Determine position
+						currentLineWidth = math.max(0, charsOnLine-1) * font.charWidth    +   math.max(0, charsOnLine-2) * font.kerning
+						local xPos = x + currentLineWidth
+						local yPos = y + font.charHeight*lineBreaks
+						
+						
+						-- if different alignments, change those values
+						if	t_halign == textblox.HALIGN_RIGHT  then
+							xPos = x - lineWidths[lineBreaks] + currentLineWidth
+
+						elseif	t_halign == textblox.HALIGN_MID  then
+							xPos = x - 0.5*(lineWidths[lineBreaks]) + currentLineWidth
+						end
+
+
+						if	t_valign == textblox.VALIGN_BOTTOM  then
+							yPos = y + (lineBreaks - totalLineBreaks - 1)*font.charHeight
+
+						elseif t_valign == textblox.VALIGN_MID  then
+							yPos = y + (lineBreaks*font.charHeight)	- ((totalLineBreaks+1)*font.charHeight*0.5)
+						end
+
+						
+						-- Process visual effects
+						local xAffected = xPos
+						local yAffected = yPos
+											
+						if  waveMode == true  then
+							yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)
+						end
+						
+						if  shakeMode == true  then
+							local shakeX = math.max(0.5, font.charWidth * 0.125)
+							local shakeY = math.max(0.5, font.charHeight * 0.125)
+							
+							xAffected = xAffected + math.random(-1*shakeX, shakeX)
+							yAffected = yAffected + math.random(-1*shakeY, shakeY)
+						end
+						
+						-- Finally, draw the image
+						font:drawCharImage (c, xAffected, yAffected, alpha)
+					end
+					
+					return c
+				end)
+			end
+			--windowDebug (textChunk)
+		end
+		
+		totalWidth = mostCharsLine * (font.kerning + font.charWidth) - font.kerning
+		totalHeight = font.charHeight * lineBreaks
+		
+		return totalWidth, totalHeight, lineBreaks, lineWidths
+	end
+end
+
+
+
 --***************************************************************************************************
 --                                                                                                  *
 --              UPDATE																			    *
@@ -1304,29 +1395,34 @@ do
 	
 	
 	textblox.overrideProps =   {scaleMode = textblox.SCALE_AUTO, 
-							width = 400,
-							height = 350,
-							bind = textblox.BIND_SCREEN,
-							font = textblox.FONT_DEFAULT,
-							speed = 0.75,
-							boxType = textblox.BOXTYPE_MENU,
-							boxColor = 0x0000FFBB,
-							autoTime = true, 
-							pauseGame = true, 
-							inputClose = true, 
-							boxAnchorX = textblox.HALIGN_MID, 
-							boxAnchorY = textblox.VALIGN_MID, 
-							textAnchorX = textblox.HALIGN_TOP, 
-							textAnchorY = textblox.VALIGN_LEFT,
-							marginX = 4,
-							marginY = 16}
+								startSound = "sound\\message.ogg",
+								typeSounds = {"bwip.ogg","bwip2.ogg","bwip3.ogg"},
+								finishSound = "sound\\zelda-dash.ogg",   --has-item
+								closeSound = "sound\\zelda-fairy.ogg",  --zelda-dash, zelda-stab, zelda-fairy
+								width = 400,
+								height = 350,
+								bind = textblox.BIND_SCREEN,
+								font = textblox.FONT_SPRITEDEFAULT3X2,
+								speed = 0.75,
+								boxType = textblox.BOXTYPE_MENU,
+								boxColor = 0x0000FFBB,
+								autoTime = true, 
+								pauseGame = true, 
+								inputClose = true, 
+								boxAnchorX = textblox.HALIGN_MID, 
+								boxAnchorY = textblox.VALIGN_MID, 
+								textAnchorX = textblox.HALIGN_TOP, 
+								textAnchorY = textblox.VALIGN_LEFT,
+								marginX = 4,
+								marginY = 16}
 	
 	
 	function textblox.onMessageBox(eventObj, message)
 		if textblox.overrideMessageBox == true  then
-			textblox.currentMessage = TextBlock.create (400,300, message, textblox.overrideProps)
+			eventObj.cancelled = true
+			mem(0x00B250E4, FIELD_STRING, "")
+			textblox.currentMessage = TextBlock.create (400,192, message, textblox.overrideProps)
 			Misc.pause ()
-			eventObj.cancelled = true			
 		end
 	end
 end	
