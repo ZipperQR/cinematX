@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 --  cinematX.lua                                                                        *
---  v0.8n                                                                             *
+--  v0.8o                                                                               *
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua                        *
 --  Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516            *
 --                                                                                      *
@@ -2284,20 +2284,20 @@ do
 	end
 
 	function cinematX.initCamera ()
-		cinematX.cameraFocusX = 0
-		cinematX.cameraFocusY = 0
+		cinematX.cameraFocusX = {0, 0}
+		cinematX.cameraFocusY = {0, 0}
 	   
-		cinematX.cameraTargetActor = -1
+		cinematX.cameraTargetObj = {{player}, {player2}}
 	   
-		cinematX.cameraOffsetX = 0
-		cinematX.cameraOffsetY = 0
+		cinematX.cameraOffsetX = {0, 0}
+		cinematX.cameraOffsetY = {0, 0}
 	   
-		cinematX.cameraXSpeed = 0
-		cinematX.cameraYSpeed = 0
+		cinematX.cameraXSpeed = {0, 0}
+		cinematX.cameraYSpeed = {0, 0}
 	   
-		cinematX.cameraControlOn = false
+		--cinematX.cameraControlOn = false
 	   
-		cinematX.cameraSize = 1
+		cinematX.cameraSize = {1, 1}
 	end
 
 
@@ -2612,22 +2612,74 @@ do
 	end
    
    
-	function cinematX.updateCamera ()
-
-		-- Camera
-		--cinematX.cameraFocusX = cinematX.cameraFocusX + cinematX.cameraXSpeed
-		--cinematX.cameraFocusY = cinematX.cameraFocusY + cinematX.cameraYSpeed        
-	   
-		if (cinematX.cameraControlOn == true) then
-			--player.x = cinematX.cameraFocusX
-			--player.y = cinematX.cameraFocusY
-			--player.speedX = 0
-			--player.speedY = 0
-			--player:mem (0x112, FIELD_WORD, 500)
+	function cinematX.updateCamera (eventObj, cameraIndex)
+		--[[
+		if  cameraIndex > 2  then
+			return;
 		end
-	   
-		--mem (cinematX.cameraXAddress, FIELD_DWORD, cinematX.cameraOffsetX)
-		--mem (cinematX.cameraYAddress, FIELD_DWORD, cinematX.cameraOffsetY)
+		--]]
+		
+		-- Get the camera object
+		local camObj = Camera.get()[cameraIndex]
+		local playerObj = Player.get()[cameraIndex]
+		local sectionObj = playerObj.sectionObj
+		
+		-- Zoom the camera
+		camObj.width = 800*cinematX.cameraSize[cameraIndex]
+		camObj.height = 600*cinematX.cameraSize[cameraIndex]
+		camObj.renderX = 400 - 0.5*camObj.width
+		camObj.renderY = 300 - 0.5*camObj.height
+	
+		-- Move when not attached to an object
+		cinematX.cameraFocusX[cameraIndex] = cinematX.cameraFocusX[cameraIndex] + cinematX.cameraXSpeed[cameraIndex]
+		cinematX.cameraFocusY[cameraIndex] = cinematX.cameraFocusY[cameraIndex] + cinematX.cameraYSpeed[cameraIndex]
+		
+		-- Snap to an object group
+		if  cinematX.cameraTargetObj[cameraIndex] ~= nil  then
+			
+			-- Scroll offset
+			cinematX.cameraOffsetX[cameraIndex] = cinematX.cameraOffsetX[cameraIndex] + cinematX.cameraXSpeed[cameraIndex]
+			cinematX.cameraOffsetY[cameraIndex] = cinematX.cameraOffsetY[cameraIndex] + cinematX.cameraYSpeed[cameraIndex]
+			
+			
+			-- get average position of objects
+			local avgX = 0
+			local avgY = 0
+			local numObjs = 0
+			
+			
+			if  cinematX.cameraTargetObj[1] ~= nil  then
+				for _,v  in pairs (cinematX.cameraTargetObj[cameraIndex])  do
+					numObjs = numObjs + 1
+					avgX = avgX + (v.x)-- + v.width*0.5)
+					avgY = avgY + (v.y)-- + v.height*0.5)
+				end
+				
+				avgX = avgX/numObjs
+				avgY = avgY/numObjs
+				
+			else
+				avgX = v.x + v.width*0.5
+				avgY = v.y + v.height*0.5
+			end
+			
+		
+			-- Set camera position
+			cinematX.cameraFocusX[cameraIndex] = avgX + cinematX.cameraOffsetX[cameraIndex] - 400
+			cinematX.cameraFocusY[cameraIndex] = avgY + cinematX.cameraOffsetY[cameraIndex] - 300
+		end
+		
+		-- Only override the camera if the camera target object is not the player the camera is normally centered on
+		if  (cinematX.cameraTargetObj[cameraIndex] ~= playerObj  and  cinematX.cameraTargetObj[cameraIndex] ~= {playerObj})  then
+			camObj.x = cinematX.cameraFocusX[cameraIndex]
+			camObj.y = cinematX.cameraFocusY[cameraIndex]
+			
+			camObj.x = math.min (math.max (camObj.x, sectionObj.boundary.left), sectionObj.boundary.right-camObj.width)
+			camObj.y = math.min (math.max (camObj.y, sectionObj.boundary.top), sectionObj.boundary.bottom-camObj.height)
+		else
+			cinematX.cameraFocusX[cameraIndex] = camObj.x
+			cinematX.cameraFocusY[cameraIndex] = camObj.y
+		end		
 	end
 
 	
