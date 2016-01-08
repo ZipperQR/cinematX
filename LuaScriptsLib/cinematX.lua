@@ -2284,8 +2284,8 @@ do
 	end
 
 	function cinematX.initCamera ()
-		cinematX.cameraFocusX = {0, 0}
-		cinematX.cameraFocusY = {0, 0}
+		cinematX.cameraX = {0, 0}
+		cinematX.cameraY = {0, 0}
 	   
 		cinematX.cameraTargetObj = {{player}, {player2}}
 	   
@@ -2631,8 +2631,8 @@ do
 		camObj.renderY = 300 - 0.5*camObj.height
 	
 		-- Move when not attached to an object
-		cinematX.cameraFocusX[cameraIndex] = cinematX.cameraFocusX[cameraIndex] + cinematX.cameraXSpeed[cameraIndex]
-		cinematX.cameraFocusY[cameraIndex] = cinematX.cameraFocusY[cameraIndex] + cinematX.cameraYSpeed[cameraIndex]
+		cinematX.cameraX[cameraIndex] = cinematX.cameraX[cameraIndex] + cinematX.cameraXSpeed[cameraIndex]
+		cinematX.cameraY[cameraIndex] = cinematX.cameraY[cameraIndex] + cinematX.cameraYSpeed[cameraIndex]
 		
 		-- Snap to an object group
 		if  cinematX.cameraTargetObj[cameraIndex] ~= nil  then
@@ -2651,8 +2651,8 @@ do
 			if  cinematX.cameraTargetObj[1] ~= nil  then
 				for _,v  in pairs (cinematX.cameraTargetObj[cameraIndex])  do
 					numObjs = numObjs + 1
-					avgX = avgX + (v.x)-- + v.width*0.5)
-					avgY = avgY + (v.y)-- + v.height*0.5)
+					avgX = avgX + (v.x + v.width*0.5)
+					avgY = avgY + (v.y + v.height*0.5)
 				end
 				
 				avgX = avgX/numObjs
@@ -2665,20 +2665,20 @@ do
 			
 		
 			-- Set camera position
-			cinematX.cameraFocusX[cameraIndex] = avgX + cinematX.cameraOffsetX[cameraIndex] - 400
-			cinematX.cameraFocusY[cameraIndex] = avgY + cinematX.cameraOffsetY[cameraIndex] - 300
+			cinematX.cameraX[cameraIndex] = avgX + cinematX.cameraOffsetX[cameraIndex] - 400
+			cinematX.cameraY[cameraIndex] = avgY + cinematX.cameraOffsetY[cameraIndex] - 300
 		end
 		
 		-- Only override the camera if the camera target object is not the player the camera is normally centered on
 		if  (cinematX.cameraTargetObj[cameraIndex] ~= playerObj  and  cinematX.cameraTargetObj[cameraIndex] ~= {playerObj})  then
-			camObj.x = cinematX.cameraFocusX[cameraIndex]
-			camObj.y = cinematX.cameraFocusY[cameraIndex]
+			camObj.x = cinematX.cameraX[cameraIndex]
+			camObj.y = cinematX.cameraY[cameraIndex]
 			
 			camObj.x = math.min (math.max (camObj.x, sectionObj.boundary.left), sectionObj.boundary.right-camObj.width)
 			camObj.y = math.min (math.max (camObj.y, sectionObj.boundary.top), sectionObj.boundary.bottom-camObj.height)
 		else
-			cinematX.cameraFocusX[cameraIndex] = camObj.x
-			cinematX.cameraFocusY[cameraIndex] = camObj.y
+			cinematX.cameraX[cameraIndex] = camObj.x
+			cinematX.cameraY[cameraIndex] = camObj.y
 		end		
 	end
 
@@ -4914,10 +4914,120 @@ do
 	end
    
    
+	cinematX.tempPanCamera = 0
+	cinematX.tempPanLock = false
+	cinematX.tempPanX = 0
+	cinematX.tempPanY = 0
+	cinematX.tempPanObj = 0
+	cinematX.tempPanSpeed = 0
+   
+	function cinematX.panToPos (camera, x,y, speed, lock)
+		cinematX.tempPanCamera = camera
+		cinematX.tempPanX = x
+		cinematX.tempPanY = y
+		cinematX.tempPanObj = nil
+		cinematX.tempPanSpeed = speed or 1
+		
+		if  lock == nil  then
+			lock = false
+		end
+		
+		cinematX.tempPanLock = lock
+		
+		cinematX.runCoroutine (cinematX.cor_panToPos)
+	end
+   
+   
+	function cinematX.panToObj (camera, object, speed, lock)
+		cinematX.tempPanCamera = camera
+		cinematX.tempPanObj = object
+		cinematX.tempPanX = object.x
+		cinematX.tempPanY = object.y
+		cinematX.tempPanSpeed = speed or 1
+		
+		if  lock == nil  then
+			lock = false
+		end
+		
+		cinematX.tempPanLock = lock
+		
+		cinematX.runCoroutine (cinematX.cor_panToPos)
+	end
+   
+   
+	function cinematX.cor_panToPos ()
+		local cam = cinematX.tempPanCamera
+		local endX = cinematX.tempPanX
+		local endY = cinematX.tempPanY
+		local speed = cinematX.tempPanSpeed
+		local lock = cinematX.tempPanLock
+		local obj = cinematX.tempPanObj
+		
+		local startX = cinematX.cameraX[cam]
+		local startY = cinematX.cameraY[cam]
+		
+		local tempCamObj = cinematX.cameraTargetObj[cam]
+		cinematX.cameraTargetObj[cam] = nil
+		
+		local currentX = startX
+		local currentY = startY
+		
+		
+		cinematX.cameraXSpeed[cam] = 0
+		cinematX.cameraYSpeed[cam] = 0
+		
+		-- Pan the camera
+		while  (currentX ~= endX and currentY ~= endY)  do
+		
+			-- Move to the object if it exists
+			if  obj ~= nil  then
+				endX = obj.x + obj.width*0.5
+				endY = obj.y + obj.height*0.5
+			end
+		
+			-- Calculate distance
+			local xToPos = endX-currentX
+			local yToPos = endY-currentY
+			local distToPos = magnitude (xToPos, yToPos)		
+			
+			-- Complete if the camera would overshoot
+			if  distToPos <= speed  then
+				currentX = endX
+				currentY = endY
+				
+			-- Otherwise, move a step
+			else
+				local xAdd, yAdd = normalize (xToPos, yToPos)
+				currentX = currentX + xAdd*speed
+				currentY = currentY + yAdd*speed
+			end
+			
+			-- Update camera
+			cinematX.cameraX[cam] = currentX
+			cinematX.cameraY[cam] = currentY
+			
+			cinematX.yield ();
+		end
+	
+		-- Cleanup on aisle 12
+		if  lock == true  then
+			if  obj == nil  then
+				cinematX.cameraTargetObj[cam] = nil
+			else
+				cinematX.cameraTargetObj[cam] = {obj}		
+			end
+		else
+			cinematX.cameraTargetObj[cam] = tempCamObj
+		end
+	end
+   
+   
+   
+	--[[
 	function cinematX.enterCameraMode ()
 		cinematX.savePlayerPosition ()
-		cinematX.cameraFocusX = player.x --0.5*(Player.screen.left + Player.screen.right)
-		cinematX.cameraFocusY = player.y --0.5*(Player.screen.top + Player.screen.bottom)
+		cinematX.cameraX = player.x --0.5*(Player.screen.left + Player.screen.right)
+		cinematX.cameraY = player.y --0.5*(Player.screen.top + Player.screen.bottom)
 		cinematX.cameraControlOn = true
 	end
    
@@ -4926,7 +5036,7 @@ do
 		player:mem (0x112, FIELD_WORD, 0)
 		cinematX.restorePlayerPosition ()
 	end
-   
+	]]
    
 	function cinematX.runCutscene (func)
 		cinematX.changeSceneMode (cinematX.SCENESTATE_CUTSCENE)
