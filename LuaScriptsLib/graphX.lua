@@ -1,5 +1,5 @@
 --graphX.lua 
---v0.3b
+--v0.3b1
 --Pretty blatantly based on colliders.lua by Hoeloe
 
 local graphX = {}
@@ -11,32 +11,16 @@ local vectr = loadSharedAPI ("vectr")
 	graphX.imageHeights = {}
 	
 	
-	local function getScreenBounds()
-		local h = (player:mem(0xD0, FIELD_DFLOAT));
-		local b = { left = player.x-400+player.speedX, right = player.x+400+player.speedX, top = player.y-260+player.speedY, bottom = player.y+340+player.speedY };
-		
-		local sect = Section(player.section);
-		local bounds = sect.boundary;
-
-		if(b.left < bounds.left - 10) then
-			b.left = bounds.left - 10;
-			b.right = b.left + 800;
+	local function getScreenBounds (camNumber)
+		if  camNumber == nil  then
+			camNumber = 1
 		end
 		
-		if(b.right > bounds.right - 10) then
-			b.right = bounds.right - 10;
-			b.left = b.right - 800;
-		end
-		
-		if(b.top < bounds.top+40-h) then
-			b.top = bounds.top+40-h;
-			b.bottom = b.top + 600;
-		end
-		
-		if(b.bottom > bounds.bottom+40-h) then
-			b.bottom = bounds.bottom+40-h;
-			b.top = b.bottom - 600;
-		end
+		local cam = Camera.get ()[camNumber]
+		local b =  {left = cam.x, 
+					right = cam.x + cam.width,
+					top = cam.y,
+					bottom = cam.y + cam.height}
 		
 		return b;
 		
@@ -45,7 +29,7 @@ local vectr = loadSharedAPI ("vectr")
 	function graphX.worldToScreen(x,y)
 		local b = getScreenBounds();
 		local x1 = x-b.left;
-		local y1 = y-b.top-(player:mem(0xD0, FIELD_DFLOAT))+30;
+		local y1 = y-b.top;
 		return x1,y1;
 	end
 	
@@ -334,7 +318,7 @@ local vectr = loadSharedAPI ("vectr")
 	end
 	
 	function graphX.menuBoxScreen (x,y,w,h, col, fillTex, borderTable)
-		local texImg = tex or graphX.MENU_FILL
+		local texImg = fillTex or graphX.MENU_FILL
 		
 		local x1 = math.min(x,x+w)
 		local y1 = math.min(y,y+h)

@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 --  cinematX.lua                                                                        *
---  v0.8o1                                                                               *
+--  v0.8p                                                                               *
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua                        *
 --  Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516            *
 --                                                                                      *
@@ -158,6 +158,10 @@ do
 			ad[cinematX.ANIMSTATE_RUN] = ad[cinematX.ANIMSTATE_WALK];
 		end
 
+		if  ad[cinematX.ANIMSTATE_JUMP] == nil  then
+			ad[cinematX.ANIMSTATE_JUMP] = ad[cinematX.ANIMSTATE_IDLE];
+		end
+		
 		if  ad[cinematX.ANIMSTATE_FALL] == nil  then
 			ad[cinematX.ANIMSTATE_FALL] = ad[cinematX.ANIMSTATE_JUMP];
 		end
@@ -1905,7 +1909,27 @@ do
 	end
    
    
-   
+	
+	function cinematX.spawnNPCActor (npcID, x,y, section, message)
+		local myNpc = NPC.spawn (npcID, x,y, section)
+		
+		if  message == nil  then
+			message = ""
+		end
+		
+		myNpc.msg.str = message
+		myNpc.friendly = true
+		
+		local myActor = nil;
+		local uid = 0;
+		myActor, uid = cinematX.indexActor (myNpc, message, true)
+		
+		--windowDebug (tostring(uid).."\n".."\n"..message)
+		
+		return myActor, myNpc, uid
+	end
+	
+	
 	function cinematX.spawnPlayerActors (amount, chars, powerups)
 	   
 		local originalTable = Player.get ()
@@ -2288,12 +2312,14 @@ do
 		cinematX.cameraY = {0, 0}
 	   
 		cinematX.cameraTargetObj = {{player}, {player2}}
-	   
+
+		cinematX.cameraIsPanning = {false, false}
+		
 		cinematX.cameraOffsetX = {0, 0}
 		cinematX.cameraOffsetY = {0, 0}
 	   
-		cinematX.cameraXSpeed = {0, 0}
-		cinematX.cameraYSpeed = {0, 0}
+		cinematX.cameraSpeedX = {0, 0}
+		cinematX.cameraSpeedY = {0, 0}
 	   
 		--cinematX.cameraControlOn = false
 	   
@@ -2448,6 +2474,8 @@ do
 		cinematX.IMGNAME_NPCICON_INSPECT_N 		=	cinematX.getImagePath ("npcIcon_InspectNew.png")
 		cinematX.IMGNAME_NPCICON_QUEST_O 		=	cinematX.getImagePath ("npcIcon_QuestOld.png")
 		cinematX.IMGNAME_NPCICON_QUEST_N 		=	cinematX.getImagePath ("npcIcon_QuestNew.png")
+		cinematX.IMGNAME_NPCICON_QUEST2_O 		=	cinematX.getImagePath ("npcIcon_Quest2Old.png")
+		cinematX.IMGNAME_NPCICON_QUEST2_N 		=	cinematX.getImagePath ("npcIcon_Quest2New.png")
 		cinematX.IMGNAME_NPCICON_PRESSUP 		=	cinematX.getImagePath ("npcIcon_PressUp.png")
 		
 	
@@ -2478,6 +2506,8 @@ do
 		cinematX.IMGREF_NPCICON_T_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_TALK_N)	
 		cinematX.IMGREF_NPCICON_Q_O			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_O)
 		cinematX.IMGREF_NPCICON_Q_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST_N)	
+		cinematX.IMGREF_NPCICON_Q2_O		=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST2_O)
+		cinematX.IMGREF_NPCICON_Q2_N		=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_QUEST2_N)	
 		cinematX.IMGREF_NPCICON_I_O			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_INSPECT_O)
 		cinematX.IMGREF_NPCICON_I_N			=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_INSPECT_N)	
 		cinematX.IMGREF_NPCICON_PRESSUP		=	Graphics.loadImage (cinematX.IMGNAME_NPCICON_PRESSUP)
@@ -2631,15 +2661,15 @@ do
 		camObj.renderY = 300 - 0.5*camObj.height
 	
 		-- Move when not attached to an object
-		cinematX.cameraX[cameraIndex] = cinematX.cameraX[cameraIndex] + cinematX.cameraXSpeed[cameraIndex]
-		cinematX.cameraY[cameraIndex] = cinematX.cameraY[cameraIndex] + cinematX.cameraYSpeed[cameraIndex]
+		cinematX.cameraX[cameraIndex] = cinematX.cameraX[cameraIndex] + cinematX.cameraSpeedX[cameraIndex]
+		cinematX.cameraY[cameraIndex] = cinematX.cameraY[cameraIndex] + cinematX.cameraSpeedY[cameraIndex]
 		
 		-- Snap to an object group
 		if  cinematX.cameraTargetObj[cameraIndex] ~= nil  then
 			
 			-- Scroll offset
-			cinematX.cameraOffsetX[cameraIndex] = cinematX.cameraOffsetX[cameraIndex] + cinematX.cameraXSpeed[cameraIndex]
-			cinematX.cameraOffsetY[cameraIndex] = cinematX.cameraOffsetY[cameraIndex] + cinematX.cameraYSpeed[cameraIndex]
+			cinematX.cameraOffsetX[cameraIndex] = cinematX.cameraOffsetX[cameraIndex] + cinematX.cameraSpeedX[cameraIndex]
+			cinematX.cameraOffsetY[cameraIndex] = cinematX.cameraOffsetY[cameraIndex] + cinematX.cameraSpeedY[cameraIndex]
 			
 			
 			-- get average position of objects
@@ -2665,21 +2695,34 @@ do
 			
 		
 			-- Set camera position
-			cinematX.cameraX[cameraIndex] = avgX + cinematX.cameraOffsetX[cameraIndex] - 400
-			cinematX.cameraY[cameraIndex] = avgY + cinematX.cameraOffsetY[cameraIndex] - 300
+			cinematX.cameraX[cameraIndex] = avgX + cinematX.cameraOffsetX[cameraIndex]
+			cinematX.cameraY[cameraIndex] = avgY + cinematX.cameraOffsetY[cameraIndex]
 		end
 		
 		-- Only override the camera if the camera target object is not the player the camera is normally centered on
 		if  (cinematX.cameraTargetObj[cameraIndex] ~= playerObj  and  cinematX.cameraTargetObj[cameraIndex] ~= {playerObj})  then
-			camObj.x = cinematX.cameraX[cameraIndex]
-			camObj.y = cinematX.cameraY[cameraIndex]
+			camObj.x = cinematX.cameraX[cameraIndex] - camObj.width/2 
+			camObj.y = cinematX.cameraY[cameraIndex] - camObj.height/2
 			
 			camObj.x = math.min (math.max (camObj.x, sectionObj.boundary.left), sectionObj.boundary.right-camObj.width)
 			camObj.y = math.min (math.max (camObj.y, sectionObj.boundary.top), sectionObj.boundary.bottom-camObj.height)
 		else
-			cinematX.cameraX[cameraIndex] = camObj.x
-			cinematX.cameraY[cameraIndex] = camObj.y
+			cinematX.cameraX[cameraIndex] = camObj.x + camObj.width/2
+			cinematX.cameraY[cameraIndex] = camObj.y + camObj.height/2
 		end		
+		
+		
+		-- DEBUG
+		--local currentX = cinematX.cameraX[cameraIndex]
+		--local currentY = cinematX.cameraY[cameraIndex]
+		
+		--graphX.boxLevelExt (currentX-64,currentY, 128,8, {color=0x9999FFFF})
+		--graphX.boxLevelExt (currentX,currentY-64, 8,128, {color=0x9999FFFF})
+			
+		--graphX.boxLevelExt (endX-64,endY, 128,8, {color=0xFF9999FF})
+		--graphX.boxLevelExt (endX,endY-64, 8,128, {color=0xFF9999FF})
+			
+
 	end
 
 	
@@ -2734,6 +2777,183 @@ do
 	cinematX.ID_MEM =  0x76
 	cinematX.ID_MEM_FIELD =  FIELD_WORD
    
+   
+   
+	function cinematX.indexActor (npcRef, message, calledFromSpawnFunc)
+
+		-- Misc/debugging vars
+		local v = npcRef
+		local thisActor = nil
+		local actorWasCreated = false
+		local shouldBeActor = true
+		local errorReason = 0
+	
+		local uid = v:mem (cinematX.ID_MEM, cinematX.ID_MEM_FIELD);
+		local isDying = false
+		if  (v:mem (0x122, FIELD_WORD)  >  0)  then
+			isDying = true
+		end
+	   
+	   
+		--Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
+		if (uid == 0  and  isDying == false)  then
+			cinematX.npcCount = cinematX.npcCount + 1;
+			uid = cinematX.npcCount;
+			v:mem (cinematX.ID_MEM, FIELD_WORD, uid);
+		   
+		elseif  isDying == true  then
+			--windowDebug("Killed: "..v.msg.str);
+		end
+		
+		
+		--Have we already defined this actor? If so, then we update the SMBX reference accordingly.
+		if (cinematX.indexedActors[uid] ~= nil) then
+			cinematX.indexedActors[uid].smbxObjRef = v;
+			cinematX.indexedActors[uid].uid = uid;
+			cinematX.indexedActors[uid].isDirty = true
+			
+			thisActor = cinematX.indexedActors[uid]
+			
+	   
+		--Otherwise, create a new actor, if necessary.
+		else
+
+			--Validity check message string to ensure we don't follow null pointers.
+			local msgStr = nil
+			if(v:mem (0x4C, FIELD_DWORD) > 0) then
+				msgStr = v.msg.str
+			elseif  message ~= nil  then
+				msgStr = message
+			else
+				cinematX.toConsoleLog ("BAD MESSAGE POINTER")
+			end
+
+			if  (msgStr ~= nil  and   msgStr ~= "") then
+
+				if (v:mem(0x122, FIELD_WORD) ~= 0)   then
+					cinematX.toConsoleLog ("STILLBORN ACTOR")
+				end
+
+			   
+				-- Run qualifier function if it exists			   
+				if  (cinematX.actorCriteria ~= nil)  then
+					shouldBeActor = cinematX.actorCriteria (v)
+				end
+			   
+				if  (shouldBeActor == true)  then
+		   
+					-- Create the actor and add it to the table
+					actorWasCreated = true
+					thisActor = Actor.create (v, "NPC")
+					thisActor.uid = uid
+					thisActor.messageNew = true  
+					thisActor.messagePointer = v:mem (0x4C, FIELD_DWORD)
+					cinematX.indexedActors[uid] = thisActor
+			   
+			   
+					-- Get the message string
+					thisActor.messageString = msgStr      
+			   
+			   
+					-- Parse the message string                                            
+		   
+					-- Get the substring between the first and last characters
+					local checkStringA = string.sub  (msgStr, 2, string.len(msgStr)-1)
+					-- Get JUST the first and last characters
+					local checkStringB = string.gsub (msgStr, checkStringA, "")
+
+					-- If this is false, not a valid cinematX message
+					local shouldClearMessage = false
+				   
+					if     (string.find (checkStringA, "[{}]") == nil
+									and  checkStringB == "{}")  then
+
+						shouldClearMessage = true
+								 
+						-- Parse tags
+						local parsedKey       = cinematX.parseTagFromNPCMessage (msgStr, "key")
+						local parsedName      = cinematX.parseTagFromNPCMessage (msgStr, "name")
+						local parsedTalkType  = cinematX.parseTagFromNPCMessage (msgStr, "verb")
+						local parsedPriority  = cinematX.parseTagFromNPCMessage (msgStr, "priority")
+						local parsedAltSub    = cinematX.parseTagFromNPCMessage (msgStr, "sub")
+						local parsedIcon      = cinematX.parseTagFromNPCMessage (msgStr, "icon")
+						local parsedScene     = cinematX.parseTagFromNPCMessage (msgStr, "scene")
+						local parsedRoutine   = cinematX.parseTagFromNPCMessage (msgStr, "routine")
+						 
+						 
+						-- Store key for use in getNPCFromKey() if parsed
+						if (parsedKey ~= nil) then
+							cinematX.npcMessageKeyIndexes[parsedKey] = uid
+							--windowDebug ("key = "..parsedKey..", "..tostring(cinematX.npcMessageKeyIndexes[parsedKey])..", "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
+						end
+				 
+						-- Store name if parsed
+						if (parsedName == nil) then
+							parsedName = ""
+						end
+						thisActor.nameString = parsedName
+				 
+						-- Store alt sub if parsed
+						--if (parsedAltSub == nil) then
+						--      parsedAltSub = nil
+						--end
+						thisActor.altSubString = parsedAltSub
+				 
+						-- Store talk type string if parsed
+						if (parsedTalkType == nil) then
+							parsedTalkType = "talk"
+						end
+						thisActor.talkTypeString = parsedTalkType
+
+						-- Store icon if parsed
+						thisActor.wordBubbleIcon = tonumber (parsedIcon)
+
+						-- Store scene
+						if (parsedScene == "nil") then
+							parsedScene = nil
+						end
+						thisActor.sceneString = parsedScene
+						--windowDebug (thisActor.sceneString)
+
+						-- Store routine
+						if (parsedRoutine == "nil") then
+							parsedRoutine = nil
+						end
+						thisActor.routineString = parsedRoutine
+
+						-- Store whether the actor is interactive
+						if  (parsedRoutine ~= nil   or   parsedScene ~= nil)  then
+							thisActor.isInteractive = true
+						end
+					end
+			   
+			   
+			   -- If set to override the SMBX message system, clear the NPC's message after storing it
+					if   (cinematX.overrideNPCMessages == true  and  shouldClearMessage == true)   then
+							local message = msgStr
+							v.msg:clear()
+							cinematX.indexedActors[uid] = thisActor
+					end
+				   
+					-- Increment the actor count
+					cinematX.actorCount = cinematX.actorCount + 1;
+					--i = i + 1;
+				end                                    
+			end
+		end
+
+		
+		--[[
+		if  calledFromSpawnFunc == true  then
+			if  thisActor ~= nil  and  actorWasCreated == true  then
+				windowDebug ("RETURNING ACTOR: UID = "..tostring(uid))
+			end
+		end
+		]]
+		
+		return thisActor, uid
+	end
+
 	function cinematX.indexActors (onlyIndexNew)
 		-- If configured not to generate actors, abort this function
 		if  (cinematX.shouldGenerateActors == false)  then
@@ -2744,155 +2964,7 @@ do
 		--local i = 0
 
 		for k,v in pairs (npcs()) do
-
-			local uid = v:mem (cinematX.ID_MEM, cinematX.ID_MEM_FIELD);
-			local isDying = false
-			if  (v:mem (0x122, FIELD_WORD)  >  0)  then
-				isDying = true
-			end
-		   
-		   
-			--Assign a new unique ID to the NPC (this applies to all NPCs, not just CinematX enabled ones.
-			if (uid == 0  and  isDying == false)  then
-				cinematX.npcCount = cinematX.npcCount + 1;
-				uid = cinematX.npcCount;
-				v:mem (cinematX.ID_MEM, FIELD_WORD, uid);
-			   
-			elseif  isDying == true  then
-				--windowDebug("Killed: "..v.msg.str);
-			end
-		   
-		   
-			--Have we already defined this actor? If so, then we update the SMBX reference accordingly.
-			if (cinematX.indexedActors[uid] ~= nil) then
-				cinematX.indexedActors[uid].smbxObjRef = v;
-				cinematX.indexedActors[uid].uid = uid;
-				cinematX.indexedActors[uid].isDirty = true
-				   
-		   
-			--Otherwise, create a new actor, if necessary.
-			else
-
-				--Validity check message string to ensure we don't follow null pointers.
-				local msgStr = nil
-				if(v:mem (0x4C, FIELD_DWORD) > 0) then
-					msgStr = v.msg.str
-				end
-
-				if  (msgStr ~= nil  and   msgStr ~= "") then
-
-					if (v:mem(0x122, FIELD_WORD) ~= 0)   then
-						cinematX.toConsoleLog ("STILLBORN ACTOR")
-					end
-
-				   
-					-- Run qualifier function if it exists
-					local shouldBeActor = true
-				   
-					if  (cinematX.actorCriteria ~= nil)  then
-						shouldBeActor = cinematX.actorCriteria (v)
-					end
-				   
-					if  (shouldBeActor == true)  then
-			   
-						-- Create the actor and add it to the table
-						local thisActor = Actor.create (v, "NPC")
-						thisActor.uid = uid
-						thisActor.messageNew = true  
-						thisActor.messagePointer = v:mem (0x4C, FIELD_DWORD)
-						cinematX.indexedActors[uid] = thisActor
-				   
-				   
-						-- Get the message string
-						thisActor.messageString = msgStr      
-				   
-				   
-						-- Parse the message string                                            
-			   
-						-- Get the substring between the first and last characters
-						local checkStringA = string.sub  (msgStr, 2, string.len(msgStr)-1)
-						-- Get JUST the first and last characters
-						local checkStringB = string.gsub (msgStr, checkStringA, "")
-
-						-- If this is false, not a valid cinematX message
-						local shouldClearMessage = false
-					   
-						if     (string.find (checkStringA, "[{}]") == nil
-										and  checkStringB == "{}")  then
-
-							shouldClearMessage = true
-									 
-							-- Parse tags
-							local parsedKey       = cinematX.parseTagFromNPCMessage (msgStr, "key")
-							local parsedName      = cinematX.parseTagFromNPCMessage (msgStr, "name")
-							local parsedTalkType  = cinematX.parseTagFromNPCMessage (msgStr, "verb")
-							local parsedPriority  = cinematX.parseTagFromNPCMessage (msgStr, "priority")
-							local parsedAltSub    = cinematX.parseTagFromNPCMessage (msgStr, "sub")
-							local parsedIcon      = cinematX.parseTagFromNPCMessage (msgStr, "icon")
-							local parsedScene     = cinematX.parseTagFromNPCMessage (msgStr, "scene")
-							local parsedRoutine   = cinematX.parseTagFromNPCMessage (msgStr, "routine")
-							 
-							 
-							-- Store key for use in getNPCFromKey() if parsed
-							if (parsedKey ~= nil) then
-								cinematX.npcMessageKeyIndexes[parsedKey] = uid
-								--windowDebug ("key = "..parsedKey..", "..tostring(cinematX.npcMessageKeyIndexes[parsedKey])..", "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
-							end
-					 
-							-- Store name if parsed
-							if (parsedName == nil) then
-								parsedName = ""
-							end
-							thisActor.nameString = parsedName
-					 
-							-- Store alt sub if parsed
-							--if (parsedAltSub == nil) then
-							--      parsedAltSub = nil
-							--end
-							thisActor.altSubString = parsedAltSub
-					 
-							-- Store talk type string if parsed
-							if (parsedTalkType == nil) then
-								parsedTalkType = "talk"
-							end
-							thisActor.talkTypeString = parsedTalkType
-
-							-- Store icon if parsed
-							thisActor.wordBubbleIcon = tonumber (parsedIcon)
-
-							-- Store scene
-							if (parsedScene == "nil") then
-								parsedScene = nil
-							end
-							thisActor.sceneString = parsedScene
-							--windowDebug (thisActor.sceneString)
-
-							-- Store routine
-							if (parsedRoutine == "nil") then
-								parsedRoutine = nil
-							end
-							thisActor.routineString = parsedRoutine
-
-							-- Store whether the actor is interactive
-							if  (parsedRoutine ~= nil   or   parsedScene ~= nil)  then
-								thisActor.isInteractive = true
-							end
-						end
-				   
-				   
-				   -- If set to override the SMBX message system, clear the NPC's message after storing it
-						if   (cinematX.overrideNPCMessages == true  and  shouldClearMessage == true)   then
-								local message = msgStr
-								v.msg:clear()
-								cinematX.indexedActors[uid] = thisActor
-						end
-					   
-						-- Increment the actor count
-						cinematX.actorCount = cinematX.actorCount + 1;
-						--i = i + 1;
-					end                                    
-				end
-			end
+			local thisActor, uid = cinematX.indexActor (v, nil, false)
 		end
 		   
 		   
@@ -3001,6 +3073,8 @@ do
 							elseif  (tempAdd == 11)  then  tempIcon = cinematX.IMGREF_NPCICON_Q_O
 							elseif  (tempAdd == 20)  then  tempIcon = cinematX.IMGREF_NPCICON_I_N
 							elseif  (tempAdd == 21)  then  tempIcon = cinematX.IMGREF_NPCICON_I_O
+							elseif  (tempAdd == 30)  then  tempIcon = cinematX.IMGREF_NPCICON_Q2_N
+							elseif  (tempAdd == 31)  then  tempIcon = cinematX.IMGREF_NPCICON_Q2_O
 							end
 								   
 						   
@@ -3617,7 +3691,12 @@ do
 			--]]
 			--windowDebug ("UPDATE UI")
 		end
-
+		
+		--local currentX = cinematX.cameraX[1]
+		--local currentY = cinematX.cameraY[1]
+		
+		--graphX.boxLevel (currentX,currentY, 8,8)--, {color=0x9999FFFF})
+		--graphX.boxLevelExt (currentX,currentY-64, 8,128, {color=0x9999FFFF})		
 	end
    
 	function cinematX.displayDebug_indexedKeys ()
@@ -4010,6 +4089,13 @@ do
 		eventu.signal (signalName)
 	end
    
+   
+	function cinematX.waitForCamera ()
+		cinematX.toConsoleLog ("Begin waiting for camera to finish panning")
+	   
+		cinematX.waitSignal ("endPanning")
+		--cinematX.waitFrames (1)
+	end
    
 	function cinematX.waitForDialog ()
 		cinematX.toConsoleLog ("Begin waiting for dialog closed")
@@ -4621,14 +4707,19 @@ do
 	end
    
    
-	function cinematX.printCenteredText (text, font, xPos, yPos, alpha)
+	function cinematX.printCenteredText (text, font, xPos, yPos, alpha, width)
 		if  alpha == nil  then
 			alpha = 1
 		end
+		
+		if width == nil  then
+			width = math.huge
+		end
+		
 	
 		if text ~= nil then
 			if  cinematX.textbloxSubtitle == true  then
-				textblox.print (text, xPos, yPos, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, 999, alpha)
+				textblox.print (text, xPos, yPos, cinematX.subtitleFont, textblox.HALIGN_MID, textblox.HALIGN_TOP, width, alpha)
 			else
 				Text.printWP (text, font, xPos-9 * string.len(text), yPos, 3.495)
 			end
@@ -4762,13 +4853,13 @@ do
 	   
 	   
 		if  tempState == cinematX.QUESTSTATE_STARTED  then
-			cinematX.printCenteredText ("QUEST ACCEPTED:", 4, 400, 200)
+			cinematX.printCenteredText ("QUEST ACCEPTED:", 4, 400, 200, 1, 700)
 		elseif  tempState == cinematX.QUESTSTATE_FINISHED  then
-			cinematX.printCenteredText ("QUEST COMPLETED:", 4, 400, 200)
+			cinematX.printCenteredText ("QUEST COMPLETED:", 4, 400, 200, 1, 700)
 		end
 	   
-		cinematX.printCenteredText (cinematX.questName[questKey], 4, 400, 240)
-		cinematX.printCenteredText (cinematX.questDescr[questKey], 4, 400, 260)
+		cinematX.printCenteredText (cinematX.questName[questKey], 4, 400, 240, 1, 700)
+		cinematX.printCenteredText (cinematX.questDescr[questKey], 4, 400, 260, 1, 700)
 		--cinematX.printCenteredText (tostring(cinematX.getQuestState(questKey)), 4, 400, 380, 60)
 	end
    
@@ -4914,6 +5005,15 @@ do
 	end
    
    
+   
+	function cinematX.resetCamera (cameraNum)
+		cinematX.cameraTargetObj[cameraNum] = {Player.get(cameraNum)}
+		cinematX.cameraOffsetX[cameraNum] = 0
+		cinematX.cameraOffsetY[cameraNum] = 0
+		cinematX.cameraSpeedX[cameraNum] = 0
+		cinematX.cameraSpeedY[cameraNum] = 0
+	end
+   
 	cinematX.tempPanCamera = 0
 	cinematX.tempPanLock = false
 	cinematX.tempPanX = 0
@@ -4921,11 +5021,11 @@ do
 	cinematX.tempPanObj = 0
 	cinematX.tempPanSpeed = 0
    
-	function cinematX.panToPos (camera, x,y, speed, lock)
-		cinematX.tempPanCamera = camera
+	function cinematX.panToPos (cameraNum, x,y, speed, lock, obj)
+		cinematX.tempPanCamera = cameraNum
 		cinematX.tempPanX = x
 		cinematX.tempPanY = y
-		cinematX.tempPanObj = nil
+		cinematX.tempPanObj = obj
 		cinematX.tempPanSpeed = speed or 1
 		
 		if  lock == nil  then
@@ -4938,20 +5038,8 @@ do
 	end
    
    
-	function cinematX.panToObj (camera, object, speed, lock)
-		cinematX.tempPanCamera = camera
-		cinematX.tempPanObj = object
-		cinematX.tempPanX = object.x
-		cinematX.tempPanY = object.y
-		cinematX.tempPanSpeed = speed or 1
-		
-		if  lock == nil  then
-			lock = false
-		end
-		
-		cinematX.tempPanLock = lock
-		
-		cinematX.runCoroutine (cinematX.cor_panToPos)
+	function cinematX.panToObj (cameraNum, object, speed, lock)
+		cinematX.panToPos (cameraNum, object.x,object.y, speed, lock, object)
 	end
    
    
@@ -4972,13 +5060,13 @@ do
 		local currentX = startX
 		local currentY = startY
 		
-		
-		cinematX.cameraXSpeed[cam] = 0
-		cinematX.cameraYSpeed[cam] = 0
+		cinematX.cameraIsPanning[cam] = true
+		cinematX.cameraSpeedX[cam] = 0
+		cinematX.cameraSpeedY[cam] = 0
 		
 		-- Pan the camera
 		while  (currentX ~= endX and currentY ~= endY)  do
-		
+			
 			-- Move to the object if it exists
 			if  obj ~= nil  then
 				endX = obj.x + obj.width*0.5
@@ -5006,6 +5094,12 @@ do
 			cinematX.cameraX[cam] = currentX
 			cinematX.cameraY[cam] = currentY
 			
+			
+			-- DEBUG
+			--graphX.boxLevel (currentX,currentY, 8,8)
+			--graphX.boxLevel (endX,endY, 8,8)
+			
+			
 			cinematX.yield ();
 		end
 	
@@ -5014,11 +5108,14 @@ do
 			if  obj == nil  then
 				cinematX.cameraTargetObj[cam] = nil
 			else
-				cinematX.cameraTargetObj[cam] = {obj}		
+				cinematX.cameraTargetObj[cam] = {obj}
 			end
 		else
 			cinematX.cameraTargetObj[cam] = tempCamObj
 		end
+		
+		cinematX.signal ("endPanning")
+		cinematX.cameraIsPanning[cam] = false
 	end
    
    
@@ -5053,6 +5150,7 @@ do
 			cinematX.playerActor:walk (0)
 		end
 			   
+		cinematX.displayQuestInfo = false
 		cinematX.currentCutscene = nil
 		--cinematX.exitCameraMode ()
 	end

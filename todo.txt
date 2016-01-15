@@ -1,0 +1,53 @@
+Things that need to be done before the stable 0.8 release:
+
+(V = check, % = in progress/needs more testing)
+
+URGENT:
+% Actor animations/movement/AI when they don't have gravity
+- Actors behave strangely near walls/get stuck
+- Break up the main Actor update loop into a more modular set of functions
+- Move initialization for all libraries to onStart and update to onTick
+V auto-timing textblox
+% textblox and keyboard wait functions
+V textblox typing sound functionality
+V fix textblox parsing bottleneck
+V finish audio functionality for textblox
+V Actor invisible states
+% Actor intangible states
+% Fix warp pipe fading
+V Nogl progress bars
+- Fix graphX Ext functions
+V fix getActorFromKey
+- figure out what the deal is with .name vs .nameString
+% textblox wrapping (occasional extra line breaks, indentation)
+V Camera controls
+- Update cinematX cheat console
+% Finish textblox.printEx (include a binding option for level/screen)
+V Stop allowing interaction with NPCs on hidden layers
+- DOCUMENTATION
+- SAMPLE EPISODE
+
+LESS IMPORTANT:
+- fancier quest UI
+- volume options for sound stuff
+- remove Misc.resolveFile from readAnimData
+- cinematX suite menu API?
+% add other boxtypes to textblox
+V add <notiming></notiming> to textblox
+- add <icon string> to textblox
+- add <timing></timing> to textblox
+- allow typesounds to be changed after text block creation
+- allow typesound interrupting
+- looping, pausing, resuming in extra sprite animation (or replace it with playerGfx/npcGfx?)
+- overridden animation flickering (maybe updating the animation loop in OnCameraUpdate or OnHUDDraw?)
+- overridable function for continue text prompt
+- more robust HP bar customization (?)
+- more accurate "yield/resume" functionality
+- steal Wasabi's boss HP bar design for the new default
+
+
+0.9+:
+- textblox emotes
+
+
+PRIORITY UNDECIDED:
