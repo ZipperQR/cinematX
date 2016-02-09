@@ -3,10 +3,11 @@ Things that need to be done before the stable 0.8 release:
 (V = check, % = in progress/needs more testing)
 
 URGENT:
+% Get cinematX suite loadable on the overworld
 % Actor animations/movement/AI when they don't have gravity
 - Actors behave strangely near walls/get stuck
 - Break up the main Actor update loop into a more modular set of functions
-- Move initialization for all libraries to onStart and update to onTick
+% Move initialization for all libraries to onStart and update to onTick
 V auto-timing textblox
 % textblox and keyboard wait functions
 V textblox typing sound functionality

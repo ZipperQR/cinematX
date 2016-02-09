@@ -1,16 +1,16 @@
 --***************************************************************************************
 --                                                                                      *
 --  cinematX.lua                                                                        *
---  v0.8p                                                                               *
+--  v0.8q                                                                               *
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua                        *
 --  Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516            *
 --                                                                                      *
 --***************************************************************************************
  
 local cinematX = {} --Package table
-local graphX, textblox, eventu, npcconfig, colliders, inputs;
+local graphX, textblox, mathX, eventu, npcconfig, colliders, inputs;
 local libsLoaded = {}
-local libsToLoad = {"graphX", "textblox", "eventu", "npcconfig", "colliders", "inputs"}
+local libsToLoad = {"graphX", "mathematX", "textblox", "eventu", "npcconfig", "colliders", "inputs"}
 local libsMissingStr = ""
 
 -- Dependency check
@@ -33,6 +33,7 @@ end
 
 -- If all dependencies are found, assign them to their proper vars
 graphX = loadSharedAPI("graphX");
+mathX = loadSharedAPI("mathematX");
 textblox = loadSharedAPI("textblox");
 eventu = loadSharedAPI("eventu");
 npcconfig = loadSharedAPI("npcconfig");
@@ -46,7 +47,7 @@ function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
 	--register event handler
 	--registerEvent(string apiName, string internalEventName, string functionToCall, boolean callBeforeMain)
    
-	registerEvent(cinematX, "onLoad", "initLevel", true) --Register the init event
+	registerEvent(cinematX, "onStart", "onStart", true) --Register the init event
 	registerEvent(cinematX, "onLoadSection", "initSection", false) --Register the init event
 	--registerEvent(cinematX, "onLoad", "delayedInit", false) --Register the init event
 	registerEvent(cinematX, "onLoop", "update", true) --Register the loop event
@@ -54,8 +55,10 @@ function cinematX.onInitAPI() --Is called when the api is loaded by loadAPI.
 	registerEvent(cinematX, "onInputUpdate", "onInputUpdate", true) --Register the input event
 	registerEvent(cinematX, "onKeyDown", "onKeyDown", true) --Register the input event
 	registerEvent(cinematX, "onKeyUp", "onKeyUp", false) --Register the input event
+	registerEvent(cinematX, "onNPCKill", "onNPCKill", false) --Register the input event
 	registerEvent(cinematX, "onCameraUpdate", "updateCamera", false) --Register the input event
 end
+ 
  
 --***************************************************************************************************
 --                                                                                                  *
@@ -371,6 +374,8 @@ do
 		thisActorObj.runAnim = cinematX.ANIMSTATE_RUN
 
 		thisActorObj.shouldDespawn = true
+		thisActorObj.canBeKilled = true
+
 		thisActorObj.isDespawned = false
 		thisActorObj.isDead = false
 		thisActorObj.savestateX = {}
@@ -417,7 +422,7 @@ do
 		thisActorObj.hitbox = nil
 		if  thisActorObj.smbxClass ~= "Player"  then
 			thisActorObj.hitbox = colliders.getSpeedHitbox (thisActorObj.smbxObjRef)
-		end            
+		end
 		thisActorObj.killOnZeroHp = false
 		thisActorObj.indefiniteKO = false
 	   
@@ -442,6 +447,7 @@ do
 		thisActorObj.framesSinceJump = 0
 		thisActorObj.jumpStrength = 0
 
+		thisActorObj.promptPriority = 0
 		thisActorObj.isInteractive = false
 		thisActorObj.sceneString = ""
 		thisActorObj.routineString = ""
@@ -891,7 +897,7 @@ do
    
    
 			function Actor:forwardOffsetX (amount)
-					local returnval = self:getCenterX() + dirSign(self:getDirection())*amount
+					local returnval = self:getCenterX() + mathX.dirSign(self:getDirection())*amount
 					return returnval
 			end
 						   
@@ -1223,7 +1229,7 @@ do
 					self.isCarrying = false
 					self.carriedNPC:mem (0x12C, FIELD_WORD, 0)
 					--self.carriedNPC.x = self.carriedNPC.x + dirSign(self:getDirection()) * 24
-					self.carriedNPC.speedX = dirSign(self:getDirection())  *  (spdForward  or 5)
+					self.carriedNPC.speedX = mathX.dirSign(self:getDirection())  *  (spdForward  or 5)
 					self.carriedNPC.speedY = -1 * (spdUp  or  5)
 					cinematX.playSFXSingle (9)
 				   
@@ -1378,7 +1384,7 @@ do
 				   
 					while  positionedYet == false  or  timePassed < forcedDelay  do
 				   
-							targetPos = otherActor:getCenterX() + distance*dirSign(offsetDir)
+							targetPos = otherActor:getCenterX() + distance*mathX.dirSign(offsetDir)
 							--Text.print (tostring(targetPos), targetPos, thisActor:getCenterY()-64)
 						   
 							thisActor.shouldFacePlayer = false
@@ -1467,7 +1473,10 @@ do
 		-- Update hidden state and collision toggle (with other actors)		
 		if  self.isHidden == true  then
 			if  self.smbxClass == "Player"  then
-				--self:setMem (0x13E, FIELD_WORD, 8)
+				--self:setMem (0x114, FIELD_WORD, 69)
+				--self:setMem (0x122, FIELD_WORD, 8)
+				self:setMem (0x140, FIELD_WORD, 25)
+				self:setMem (0x142, FIELD_WORD, 0)
 				if  wasHidden == false  then
 				end
 				--self:setMem (0x122, FIELD_WORD, 8)
@@ -1482,7 +1491,9 @@ do
 		elseif  self.wasHidden == true  then
 			if  self.smbxClass == "Player"  then
 				--self:setMem (0x13E, FIELD_WORD, 8)				
-				self:setMem (0x122, FIELD_WORD, 0)
+				--self:setMem (0x122, FIELD_WORD, 0)
+				self:setMem (0x140, FIELD_WORD, 0)
+				self:setMem (0x142, FIELD_WORD, 0)
 				--self.smbxObjRef.x = self.smbxObjRef.x - 32
 				--self.smbxObjRef.y = self.smbxObjRef.y - 32
 			end
@@ -1588,26 +1599,31 @@ do
 	   
 		-- Following behavior
 		do
-			-- if following a block, NPC or another actor, set their position as the destination X
+			-- if following a block, NPC or another actor, get info about their behavior
 			local leaderToFollow = nil
 			local leaderX = 0
 			local leaderY = 0
+			local leaderGroundY = 0
+			local leaderOnGround = false
 			local leaderJumpStrength = 0
 			local leaderJumpFrames = 0
 			local leaderDirection = DIR_LEFT
 		   
+			-- Actor
 			if (self.actorToFollow ~= nil) then
 				local leadActor = self.actorToFollow
 			   
 				leaderToFollow = leadActor
 				leaderX = leadActor:getCenterX()
 				leaderY = leadActor:getY()
+				leaderGroundY = leadActor:getBottomY ()
+				leaderOnGround = leadActor.onGround
 				leaderJumpStrength = leadActor.jumpStrength
 				leaderJumpFrames = leadActor.framesSinceJump
 				leaderDirection = leadActor:getDirection ()
 			end
 		   
-		   
+			-- Block
 			if (self.blockToFollow ~= nil) then
 				leaderToFollow = self.blockToFollow
 				leaderX = self.blockToFollow.x
@@ -1624,11 +1640,13 @@ do
 				leaderDirection = self:getDirection ()
 			end
 				   
-				   
+			-- NPC
 			if (cinematX.validateNPCRef(self.npcToFollow)) then
 				leaderToFollow = self.npcToFollow
 				leaderX = leaderToFollow.x + (leaderToFollow.width*0.5)
 				leaderY = leaderToFollow.y + (leaderToFollow.height*0.5)
+				leaderGroundY = leaderToFollow.y + leaderToFollow.height
+				leaderOnGround = leaderToFollow.collidesBlockBottom
 				leaderJumpStrength = 8
 				leaderJumpFrames = 0
 			   
@@ -1642,7 +1660,9 @@ do
 			else
 				self.npcToFollow = nil
 			end
-				   
+			
+
+			-- If following somebody or something, process the following AI
 			if  leaderToFollow  ~=  nil  and  self.stunCountdown <= 0               then
 				self.walkDestX = leaderX
 			   
@@ -1653,7 +1673,7 @@ do
 						self:getSpeedY() == 0       and
 						self:getY() > leaderY+64)      then
 						 
-						self:jump (leaderJumpStrength * 0.5)         
+						self:jump (leaderJumpStrength)-- * 0.5)         
 				   
 					-- Swim
 					elseif  (self:getY() > leaderY+32)      then
@@ -1695,11 +1715,14 @@ do
 				   
 					if  true  then
 						telePosX = leaderX
-						telePosY = leaderY
+					end
+				   
+					if  leaderOnGround == true  then
+						telePosY = leaderGroundY - self.smbxObjRef.height
 					end
 				   
 					self:teleportToPosition (telePosX,
-											 leaderY - 32)
+											 telePosY)
 				end
 			end
 		end
@@ -1725,7 +1748,7 @@ do
 
 				   
 			-- Position the carried NPC above/in front of the actor
-			local carryX = self:getX() + 24*dirSign (self:getDirection ())
+			local carryX = self:getX() + 24*mathX.dirSign (self:getDirection ())
 			local carryY = self:getBottomY() - 36
 		   
 			if  self.carryStyle == 1  then
@@ -1821,10 +1844,10 @@ do
 			if (destDist < 0) then destDist = 0 end
 		   
 			-- Get direction multiplier
-			local dirMult = dirSign (self:dirToX (self.walkDestX))
+			local dirMult = mathX.dirSign (self:dirToX (self.walkDestX))
 		   
 			-- Get acceleration multiplier
-			local accelMult = invLerp (0,self.distanceToAccel, destDist)
+			local accelMult = mathX.invLerp (0,self.distanceToAccel, destDist)
 		   
 			-- Walk
 			--self.walkSpeed = 0
@@ -1985,6 +2008,17 @@ do
 		return newTable
 	end
    
+   
+	function cinematX.onNPCKill (eventObj, killedNPC, killReason)
+		
+		-- Prevent actors from dying if flagged not to
+		local thisActor = cinematX.getActorFromNPC (killedNPC)
+		if  thisActor ~= nil  then
+			if thisActor.canBeKilled == false  then
+				eventObj.cancelled = true
+			end
+		end
+	end
 end
  
  
@@ -2098,9 +2132,9 @@ do
    
    
    
-	function cinematX.initLevel ()
+	function cinematX.onStart ()
 		-- Prevent this function from being called twice
-		if  (cinematX.initCalledYet == true)  then  return  end
+		--if  (cinematX.initCalledYet == true)  then  return  end
 
 		cinematX.playerActor = Actor.create(player, "Player")
 
@@ -2278,7 +2312,7 @@ do
 		cinematX.subtitleFontProps ["image"] = cinematX.IMGREF_FONT1
 		cinematX.subtitleFontProps ["kerning"] = -1
 	   
-		cinematX.subtitleFont = Font.create (textblox.FONTTYPE_SPRITE, cinematX.subtitleFontProps)
+		cinematX.subtitleFont = textblox.createFont (textblox.FONTTYPE_SPRITE, cinematX.subtitleFontProps)
 	   
 	   
 		cinematX.subtitleBoxProps = {}
@@ -2300,7 +2334,7 @@ do
 		cinematX.subtitleBoxProps ["visible"] = true
 		cinematX.subtitleBoxProps ["autoClose"] = false
 	   
-		cinematX.subtitleBoxBlock = TextBlock.create (8, 468+32, "", cinematX.subtitleBoxProps)
+		cinematX.subtitleBoxBlock = textblox.createBlock (8, 468+32, "", cinematX.subtitleBoxProps)
 	   
 	   
 		-- Has this function been called?
@@ -2629,16 +2663,19 @@ do
 
    
 	function cinematX.updateTextblox ()
-		-- Trigger finish signals
-		for  k,v in pairs (textblox.textBlockRegister)  do  
-			if  v.deleteMe == true  then
-				cinematX.signal ("blockClose_"..v.index)
+		if  textblox ~= nil  then
+			
+			-- Trigger finish signals
+			for  k,v in pairs (textblox.textBlockRegister)  do
+				if  v.deleteMe == true  then
+					cinematX.signal ("blockClose_"..v.index)
+				end
+			   
+				if  v.finished == true  then
+					cinematX.signal ("blockFinish_"..v.index)
+				end
 			end
-		   
-			if  v.finished == true  then
-				cinematX.signal ("blockFinish_"..v.index)
-			end
-		end            
+		end
 	end
    
    
@@ -2887,40 +2924,41 @@ do
 							--windowDebug ("key = "..parsedKey..", "..tostring(cinematX.npcMessageKeyIndexes[parsedKey])..", "..tostring(cinematX.npcMessageKeyIndexes["calleoca"]))
 						end
 				 
+				 
+						-- Store priority if parsed
+						thisActor.promptPriority = tonumber(parsedPriority) or 10
+				 
+				 
 						-- Store name if parsed
-						if (parsedName == nil) then
-							parsedName = ""
-						end
-						thisActor.nameString = parsedName
+						thisActor.nameString = parsedName  or  ""
+				 
 				 
 						-- Store alt sub if parsed
-						--if (parsedAltSub == nil) then
-						--      parsedAltSub = nil
-						--end
 						thisActor.altSubString = parsedAltSub
 				 
+				 
 						-- Store talk type string if parsed
-						if (parsedTalkType == nil) then
-							parsedTalkType = "talk"
-						end
-						thisActor.talkTypeString = parsedTalkType
+						thisActor.talkTypeString = parsedTalkType  or  "talk"
 
+						
 						-- Store icon if parsed
 						thisActor.wordBubbleIcon = tonumber (parsedIcon)
 
+						
 						-- Store scene
 						if (parsedScene == "nil") then
 							parsedScene = nil
 						end
 						thisActor.sceneString = parsedScene
-						--windowDebug (thisActor.sceneString)
 
+						
 						-- Store routine
 						if (parsedRoutine == "nil") then
 							parsedRoutine = nil
 						end
 						thisActor.routineString = parsedRoutine
 
+						
 						-- Store whether the actor is interactive
 						if  (parsedRoutine ~= nil   or   parsedScene ~= nil)  then
 							thisActor.isInteractive = true
@@ -3017,7 +3055,13 @@ do
    
 	function cinematX.updateNPCMessages ()
 		cinematX.currentMessageActor = nil
-			   
+		
+		local highestPriority = -math.huge
+		local finalSubStr = "[UP] to talk."
+		local finalNameStr = ""
+		local showPrompt = false
+		
+		
 		if   (cinematX.overrideNPCMessages == true   and   cinematX.currentSceneState == cinematX.SCENESTATE_PLAY)   then
 
 			cinematX.refreshHUDOverlay ()
@@ -3045,7 +3089,7 @@ do
 							end
 						end
 						
-										
+						
 						if  (v:distanceActor (cinematX.playerActor) < 800   			and  
 							(v.isInteractive == true  or  v.altSubString ~= nil))       and
 							(vHiddenLayer == false)										then
@@ -3081,26 +3125,28 @@ do
 							-- NPC Interaction indicators
 							if      (cinematX.showConsole == false)  then                                  
 					   
-								-- If the player is close enough, store the NPC's index in      currentMessageNPCIndex
+								-- If the player is close enough, store the NPC's properties in      currentMessageNPCIndex
 								if  v:distanceActor (cinematX.playerActor) < 48  then
-									   
-									if  v.isInteractive  then
+									
+									local subStr = v.altSubString
+									
+									if  (v.isInteractive  or  subStr ~= nil)  and  v.promptPriority > highestPriority  then
+										showPrompt = true
+										highestPriority = v.promptPriority
+
 										cinematX.currentMessageNPCObj = v.smbxObjRef
 										cinematX.currentMessageNPCIndex = k
 										cinematX.currentMessageActor = v
-									end
-								   
-									--tempIcon = cinematX.IMGSLOT_NPCICON_PRESSUP
-
-									if  cinematX.dialogOn == false  then
-										cinematX.subtitleBox = true                                                            
-										local subStr = v.altSubString
-									   
+										
 										if  subStr == nil  then
 											subStr = "[UP] to "..v.talkTypeString.."."
-										end
-							   
-										cinematX.displayNPCSubtitle (v.nameString, subStr)
+										end							   
+										finalSubStr = subStr
+
+										
+										if  v.nameString ~= nil  then
+											finalNameStr = v.nameString
+										end							   
 									end
 								end
 									   
@@ -3121,6 +3167,13 @@ do
 					--]]
 				end
 			end
+			
+			
+			-- Display the subtitle
+			if  showPrompt == true  and  cinematX.dialogOn == false  then
+				cinematX.subtitleBox = true									   
+				cinematX.displayNPCSubtitle (finalNameStr, finalSubStr)
+			end
 		end
 	end
    
@@ -3132,8 +3185,8 @@ do
 		then
    
 			-- Calculate relative position of player and opponent
-			cinematX.racePlayerPos = invLerp (cinematX.raceStartX, cinematX.raceEndX, cinematX.playerActor:getX ())
-			cinematX.raceEnemyPos = invLerp (cinematX.raceStartX, cinematX.raceEndX, cinematX.raceEnemyActor:getX ())              
+			cinematX.racePlayerPos = mathX.invLerp (cinematX.raceStartX, cinematX.raceEndX, cinematX.playerActor:getX ())
+			cinematX.raceEnemyPos = mathX.invLerp (cinematX.raceStartX, cinematX.raceEndX, cinematX.raceEnemyActor:getX ())              
 		   
 			--[[
 			printText (tostring(cinematX.racePlayerPos), 4, 5, 300)
@@ -3232,7 +3285,7 @@ do
 		graphX.boxScreen (0,0, 800,600,  cinematX.screenTintColor)
 	   
 		-- SCREEN FADE
-		local screenFadeCol = 0x00000000 + math.floor(lerp(0, 255, cinematX.screenTransitionAmt))
+		local screenFadeCol = 0x00000000 + math.floor(mathX.lerp(0, 255, cinematX.screenTransitionAmt))
 		if  (cinematX.canUseNewUI == true)  then
 			graphX.boxScreen (0,0, 800,600,  screenFadeCol)
 		else
@@ -3247,7 +3300,7 @@ do
 		else
 			cinematX.letterboxAlphaMult = math.max(0, cinematX.letterboxAlphaMult - cinematX.letterboxAlphaRate)
 		end
-		cinematX.letterboxAlphaHex =    lerp(0x00000000, 0x000000FF, cinematX.letterboxAlphaMax * cinematX.letterboxAlphaMult)
+		cinematX.letterboxAlphaHex =    mathX.lerp(0x00000000, 0x000000FF, cinematX.letterboxAlphaMax * cinematX.letterboxAlphaMult)
 	   
 			   
 	   
@@ -3327,8 +3380,8 @@ do
 		if   cinematX.currentSceneState == cinematX.SCENESTATE_RACE   then
 			local raceMeterLeft = 48
 			local raceMeterRight = 800-80
-			local racePlayerIconX = lerp (raceMeterLeft, raceMeterRight, cinematX.racePlayerPos)
-			local raceEnemyIconX = lerp (raceMeterLeft, raceMeterRight, cinematX.raceEnemyPos)
+			local racePlayerIconX = mathX.lerp (raceMeterLeft, raceMeterRight, cinematX.racePlayerPos)
+			local raceEnemyIconX = mathX.lerp (raceMeterLeft, raceMeterRight, cinematX.raceEnemyPos)
 			local barY = 520
 
 			Graphics.drawImageWP (cinematX.IMGREF_RACEFLAGSTART,    	raceMeterLeft,          barY,  3.494)
@@ -3845,7 +3898,7 @@ do
    
 	function cinematX.onJump ()            
 		cinematX.playerHoldingJump = true
-		cinematX.playerActor.jumpStrength = 17
+		cinematX.playerActor.jumpStrength = 8.5
 		cinematX.playerActor.framesSinceJump = 0
 	end
    
@@ -3895,71 +3948,6 @@ do
 		if  (cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE   and   cinematX.freezeDuringCutscenes == true)  or  (cinematX.freezePlayer == true)  then
 			   
 			inputs.locked["all"] = true
-			
-			--[[
-			player.upKeyPressing = false
-			player.downKeyPressing = false
-		   
-			-- Dialogue input workaround
-			playerPressedLeft = false
-			playerPressedRight = false
-			playerPressedRun = false
-			playerPressedJump = false
-
-		   
-			if  (player.leftKeyPressing == true)    then
-				   
-				if  (playerLeftKeyStop == false)                then
-					playerPressedLeft = true
-					playerLeftKeyStop = true
-				end
-			else
-				playerLeftKeyStop = false                      
-			end
-		   
-		   
-			if  (player.rightKeyPressing == true)   then
-				   
-				if  (playerRightKeyStop == false)               then
-					playerPressedRight = true
-					playerRightKeyStop = true
-				end
-			else
-				playerRightKeyStop = false                     
-			end
-		   
-		   
-			if  (player.runKeyPressing == true)             then
-				   
-				if  (playerRunKeyStop == false)         then
-					playerPressedRun = true
-					playerRunKeyStop = true
-				end
-			else
-				playerRunKeyStop = false                       
-			end            
-
-		   
-			if  (player.jumpKeyPressing == true)    then
-			   
-				if  (playerJumpKeyStop == false)                then
-					playerPressedJump = true
-					playerJumpKeyStop = true
-				end
-			else
-				playerJumpKeyStop = false                      
-			end
-		   
-
-			player.leftKeyPressing = false
-			player.rightKeyPressing = false
-		   
-			player.jumpKeyPressing = false
-			player.altJumpKeyPressing = false
-			player.runKeyPressing = false
-			player.altRunKeyPressing = false
-			player.dropItemKeyPressing = false
-			]]
 		end
 	end
 
@@ -4451,6 +4439,7 @@ do
 		local autoTime = cinematX.dialogSetting_autoTime
 		local boxType = cinematX.dialogSetting_boxType
 		local bloxProps = cinematX.dialogSetting_bloxProps
+		local question = cinematX.dialogIsQuestion
 		local answers = cinematX.dialogSetting_Answers
 
 		local textSpeed = cinematX.dialogTextSpeed
@@ -4524,8 +4513,12 @@ do
 				end
 			end
 		   
+			if  properties["question"] ~= nil  then
+				question = properties["question"]                                       -- boolean
+			end
+			
 			if  properties["answers"] ~= nil  then
-				answers = properties["answers"]                                         -- textblox property table
+				answers = properties["answers"]                                         -- string table
 			end
 		end
 	   
@@ -4537,7 +4530,11 @@ do
 			cinematX.subtitleBoxBlock.finishDelay = closeTime
 			cinematX.dialogSetting_showThisPrompt = showPrompt
 	   
-			cinematX.startDialog (speakerActor, txtName, text, promptTime, speakTime, startSound, autoEnd, skippable)
+			if  question == true  then
+				cinematX.startQuestion (speakerActor, txtName, text, promptTime, speakTime, startSound, autoEnd, skippable)
+			else
+				cinematX.startDialog (speakerActor, txtName, text, promptTime, speakTime, startSound, autoEnd, skippable)
+			end
 	   
 		elseif  boxType == cinematX.BOXTYPE_SMBX        then
 			Text.showMessageBox (text)
@@ -4551,7 +4548,7 @@ do
 				cinematX.triggerDialogSpeaker (speakerActor, speakTime)
 			end
 			]]
-			returnObj = TextBlock.create (x,y, text, bloxProps)
+			returnObj = textblox.createBlock (x,y, text, bloxProps)
 	   
 		end
 	   
@@ -4996,8 +4993,8 @@ do
 		local currentTime = 0
 	   
 		while  currentTime < colTime  do
-			local lerpAmt = invLerp (0, colTime, currentTime)
-			local col = lerp (colS, colE, lerpAmt)
+			local lerpAmt = mathX.invLerp (0, colTime, currentTime)
+			local col = mathX.lerp (colS, colE, lerpAmt)
 			cinematX.screenTintColor = col
 			currentTime = currentTime + cinematX.deltaTime
 			cinematX.waitSeconds(0.0)
@@ -5076,7 +5073,7 @@ do
 			-- Calculate distance
 			local xToPos = endX-currentX
 			local yToPos = endY-currentY
-			local distToPos = magnitude (xToPos, yToPos)		
+			local distToPos = mathX.magnitude (xToPos, yToPos)		
 			
 			-- Complete if the camera would overshoot
 			if  distToPos <= speed  then
@@ -5085,7 +5082,7 @@ do
 				
 			-- Otherwise, move a step
 			else
-				local xAdd, yAdd = normalize (xToPos, yToPos)
+				local xAdd, yAdd = mathX.normalize (xToPos, yToPos)
 				currentX = currentX + xAdd*speed
 				currentY = currentY + yAdd*speed
 			end
@@ -5152,6 +5149,7 @@ do
 			   
 		cinematX.displayQuestInfo = false
 		cinematX.currentCutscene = nil
+		cinematX.cutsceneSkippable = false
 		--cinematX.exitCameraMode ()
 	end
    
@@ -5498,7 +5496,7 @@ end
 --***************************************************************************************************
  
 do
- 
+	--[[
 	function dirSign (direction)
 		local dirMult = -1
 		if direction == DIR_RIGHT then
@@ -5571,6 +5569,7 @@ do
 		local newY = -(yPos + 1572864.08)/8
 		return newY
 	end
+	]]
 end
  
  

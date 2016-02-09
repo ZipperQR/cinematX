@@ -1,14 +1,39 @@
---graphX.lua 
---v0.3b1
---Pretty blatantly based on colliders.lua by Hoeloe
+--***************************************************************************************
+--                                                                                      *
+--  graphX.lua                                                                          *
+--  v0.3c                                                                               *
+--  Based on colliders.lua by Hoeloe                                                    *
+--                                                                                      *
+--***************************************************************************************
 
 local graphX = {}
 local vectr = loadSharedAPI ("vectr")
+local mathematX = loadSharedAPI ("mathematX")
 
-	graphX.resourcePath = "..\\..\\..\\LuaScriptsLib\\graphX\\"
+	graphX.resourcePath     = "..\\..\\..\\LuaScriptsLib\\graphX\\"
+	graphX.resourcePathOver = "..\\..\\LuaScriptsLib\\graphX\\"
 
 	graphX.imageWidths = {}
 	graphX.imageHeights = {}
+	
+	
+	
+	function graphX.getPath (filename)		
+		--windowDebug ("TEST")
+		
+		local localPath = Misc.resolveFile (filename)  
+						
+		if  localPath  ~=  nil  then
+			return localPath
+		end
+		
+		if isOverworld == true  then
+			return graphX.resourcePathOver..filename
+		end
+		
+		return graphX.resourcePath..filename
+	end
+	
 	
 	
 	local function getScreenBounds (camNumber)
@@ -26,8 +51,8 @@ local vectr = loadSharedAPI ("vectr")
 		
 	end
 
-	function graphX.worldToScreen(x,y)
-		local b = getScreenBounds();
+	function graphX.worldToScreen (x,y)
+		local b = getScreenBounds ();
 		local x1 = x-b.left;
 		local y1 = y-b.top;
 		return x1,y1;
@@ -216,7 +241,7 @@ local vectr = loadSharedAPI ("vectr")
 			local rotX = xMid + cosMult * (points[i] - xMid) - sinMult * (points[i+1] - yMid);
 			local rotY = yMid + sinMult * (points[i] - xMid) + cosMult * (points[i+1] - yMid);
 			
-			local newU, newV = invLerp (texL,texR, rotX), invLerp (texT,texB, rotY);
+			local newU, newV = mathematX.invLerp (texL,texR, rotX), mathematX.invLerp (texT,texB, rotY);
 			
 			uvs[i] = newU;
 			uvs[i+1] = newV;
@@ -301,15 +326,15 @@ local vectr = loadSharedAPI ("vectr")
 	--***************************************************************************************************
 
 	
-	graphX.MENU_FILL = Graphics.loadImage(graphX.resourcePath.."menuFillA.png")
-	graphX.BORDER_UL = Graphics.loadImage(graphX.resourcePath.."menuBorderUL.png")
-	graphX.BORDER_UR = Graphics.loadImage(graphX.resourcePath.."menuBorderUR.png")
-	graphX.BORDER_DL = Graphics.loadImage(graphX.resourcePath.."menuBorderDL.png")
-	graphX.BORDER_DR = Graphics.loadImage(graphX.resourcePath.."menuBorderDR.png")
-	graphX.BORDER_U = Graphics.loadImage(graphX.resourcePath.."menuBorderU.png")
-	graphX.BORDER_D = Graphics.loadImage(graphX.resourcePath.."menuBorderD.png")
-	graphX.BORDER_L = Graphics.loadImage(graphX.resourcePath.."menuBorderL.png")
-	graphX.BORDER_R = Graphics.loadImage(graphX.resourcePath.."menuBorderR.png")
+	graphX.MENU_FILL = Graphics.loadImage(graphX.getPath("menuFillA.png"))
+	graphX.BORDER_UL = Graphics.loadImage(graphX.getPath("menuBorderUL.png"))
+	graphX.BORDER_UR = Graphics.loadImage(graphX.getPath("menuBorderUR.png"))
+	graphX.BORDER_DL = Graphics.loadImage(graphX.getPath("menuBorderDL.png"))
+	graphX.BORDER_DR = Graphics.loadImage(graphX.getPath("menuBorderDR.png"))
+	graphX.BORDER_U = Graphics.loadImage(graphX.getPath("menuBorderU.png"))
+	graphX.BORDER_D = Graphics.loadImage(graphX.getPath("menuBorderD.png"))
+	graphX.BORDER_L = Graphics.loadImage(graphX.getPath("menuBorderL.png"))
+	graphX.BORDER_R = Graphics.loadImage(graphX.getPath("menuBorderR.png"))
 
 	
 	function graphX.menuBoxLevel (x,y,w,h, col, fillTex, borderTable)
@@ -476,49 +501,6 @@ local vectr = loadSharedAPI ("vectr")
 	end
 		
 	
-	
---***************************************************************************************************
---                                                                       		                    *
--- 				MATH																				*
---                                                                                                  *
---***************************************************************************************************
-	
 
 	
-	function lerp (minVal, maxVal, percentVal)
-		return (1-percentVal) * minVal + percentVal*maxVal;
-	end
-	
-	function invLerp (minVal, maxVal, amountVal)			
-		return (amountVal-minVal) / (maxVal - minVal)
-	end
-	
-	
-	--[[
-	-- math.cos and math.sin expect a radian value, and this little function converts degrees to radians
-	toRadians = function(degrees)
-		return degrees / 180 * math.pi 
-	end 
-	 
-	function rotateVector(point, xMid, yMid, degrees)
-		local x = origin.x + ( math.cos(toRadians(degrees)) * (point.x - origin.x) - math.sin(toRadians(degrees)) * (point.y - origin.y) )
-		local y = origin.y + ( math.sin(toRadians(degrees)) * (point.x - origin.x) + math.cos(toRadians(degrees)) * (point.y - origin.y) )
-		point.x = x
-		point.y = y
-	end
-	--]]
-	
-	
-	function graphX.rotateVector (xMid, yMid, xOff, yOff, angleAdd)
-		angleAdd = (angleAdd) * (math.pi/180); -- Convert to radians
-	
-		local newX = xMid + math.cos(angleAdd) * (xOff - xMid) - math.sin(angleAdd) * (yOff - yMid);
-		local newY = yMid + math.sin(angleAdd) * (xOff - xMid) + math.cos(angleAdd) * (yOff - yMid);
- 
-		return newX,newY
-		
-	end
-	
-	
-		
 return graphX;

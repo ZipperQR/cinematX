@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.0g                                                      						*
+--  v0.2.1                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
@@ -23,6 +23,7 @@ end
 textblox.textBlockRegister = {}
 --textblox.textBlockGarbageQueue = {}
 textblox.resourcePath = "..\\..\\..\\LuaScriptsLib\\textblox\\"
+textblox.resourcePathOver = "..\\..\\LuaScriptsLib\\textblox\\"
 
 
 textblox.useGlForFonts = false
@@ -48,6 +49,10 @@ textblox.currentMessage = nil
 			return localPath
 		end
 		
+		if isOverworld == true  then
+			return textblox.resourcePathOver..filename
+		end
+		
 		return textblox.resourcePath..filename
 	end
 
@@ -61,15 +66,15 @@ textblox.currentMessage = nil
 --                                                                                                  *
 --***************************************************************************************************
 
+local Font = {}
+Font.__index = Font
+	
 do
 	
 	textblox.FONTTYPE_DEFAULT = 0
 	textblox.FONTTYPE_SPRITE = 1
 	textblox.FONTTYPE_TTF = 2   --NOT SUPPORTED YET
 
-
-	Font = {}
-	Font.__index = Font
 
 	function Font.create (fontType, properties)
 		local thisFont = {}
@@ -120,6 +125,10 @@ do
 			
 		return thisFont
 	end	
+
+	function textblox.createFont (fontType, properties)
+		return Font.create (fontType, properties)
+	end
 
 	
 	function Font:drawCharImage (character, x,y, opacity, color)
@@ -190,7 +199,7 @@ end
 --***************************************************************************************************
 
 do 
-	textblox.FONT_DEFAULT = Font.create (textblox.FONTTYPE_DEFAULT, 4)  
+	textblox.FONT_DEFAULT = textblox.createFont (textblox.FONTTYPE_DEFAULT, 4)  
 
 	textblox.IMGNAME_DEFAULTSPRITEFONT 		= textblox.getPath ("font_default.png")
 	textblox.IMGNAME_DEFAULTSPRITEFONTX2 	= textblox.getPath ("font_default_x2.png")
@@ -226,12 +235,12 @@ do
 	textblox.IMGREF_BUBBLE_BORDER_DR	 	= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_DR)
 	
 	
-	textblox.FONT_SPRITEDEFAULT 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 8, 	charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT, 		kerning = 0})
-	textblox.FONT_SPRITEDEFAULTX2 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONTX2, 	kerning = 0})
-	textblox.FONT_SPRITEDEFAULT2 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 8, 	charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2, 	kerning = 0})
-	textblox.FONT_SPRITEDEFAULT2X2 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2X2, 	kerning = 0})
-	textblox.FONT_SPRITEDEFAULT3 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 9, 	charHeight = 9, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3, 	kerning = 0})
-	textblox.FONT_SPRITEDEFAULT3X2 	= Font.create (textblox.FONTTYPE_SPRITE, {charWidth = 18, 	charHeight = 18, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3X2, 	kerning = -2})
+	textblox.FONT_SPRITEDEFAULT 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 8, 	charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT, 		kerning = 0})
+	textblox.FONT_SPRITEDEFAULTX2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONTX2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 8, 	charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT2X2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2X2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT3 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 9, 	charHeight = 9, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT3X2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 18, 	charHeight = 18, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3X2, 	kerning = -2})
 end
 
 
@@ -241,6 +250,10 @@ end
 --              TEXT BLOCK CLASS																    *
 --                                                                                                  *
 --***************************************************************************************************
+
+
+local TextBlock = {}
+TextBlock.__index = TextBlock
 
 do
 	textblox.BOXTYPE_NONE = 1
@@ -263,8 +276,6 @@ do
 	textblox.VALIGN_BOTTOM = 3
 	
 	
-	TextBlock = {}
-	TextBlock.__index = TextBlock
 	
 	function TextBlock.create(x,y, textStr, properties)
 		
@@ -435,6 +446,10 @@ do
 		return thisTextBlock
 	end
 
+	function textblox.createBlock (x,y, textStr, properties)
+		return TextBlock.create (x,y, textStr, properties)
+	end
+	
 	
 	function TextBlock:getCharsPerLine ()
 		local numCharsPerLine = math.floor((self.width)/(self.font.charWidth + self.font.kerning))
@@ -1384,6 +1399,7 @@ do
 				table.remove (textblox.textBlockRegister, k);
 			
 			else
+				v.index = k;
 				v:update ()
 				k = k+1;
 			end
