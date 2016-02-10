@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 --  cinematX.lua                                                                        *
---  v0.8q                                                                               *
+--  v0.8q1                                                                              *
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua                        *
 --  Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516            *
 --                                                                                      *
@@ -3461,7 +3461,7 @@ do
 
 
 		-- DISPLAY DIALOGUE/SUBTITLES
-		if   cinematX.dialogOn == true  and  (cinematX.currentSceneState == cinematX.SCENESTATE_PLAY  or  cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE)  then
+		if   cinematX.dialogOn == true  --[[and  (cinematX.currentSceneState == cinematX.SCENESTATE_PLAY  or  cinematX.currentSceneState == cinematX.SCENESTATE_CUTSCENE)]]  then
 
 			if  cinematX.textbloxSubtitle == true  then
 				cinematX.subtitleBoxBlock.visible = true
@@ -4047,7 +4047,9 @@ do
 	
 	function cinematX.abortCoroutine (func)
 		eventu.abort (func)
-		
+	end
+	
+	function cinematX.abortCutscene (func)		
 		-- change scene state
 		if  cinematX.currentSceneState == SCENESTATE_CUTSCENE  then
 			cinematX.endCutscene ()
@@ -4057,6 +4059,9 @@ do
 		if  cinematX.dialogOn == true  then
 			cinematX.endDialogLine ()
 		end
+		
+		-- End the routine
+		cinematX.abortCoroutine (func)
 	end
 	 
 	function cinematX.setSkipScene (func)
