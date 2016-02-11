@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.1                                                      						*
+--  v0.2.2                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
@@ -126,7 +126,7 @@ do
 		return thisFont
 	end	
 
-	function textblox.createFont (fontType, properties)
+	function textblox.Font (fontType, properties)
 		return Font.create (fontType, properties)
 	end
 
@@ -242,6 +242,312 @@ do
 	textblox.FONT_SPRITEDEFAULT3 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 9, 	charHeight = 9, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3, 	kerning = 0})
 	textblox.FONT_SPRITEDEFAULT3X2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 18, 	charHeight = 18, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3X2, 	kerning = -2})
 end
+
+
+
+
+--***************************************************************************************************
+--                                                                                                  *
+--              PRINT FUNCTIONS																	    *
+--                                                                                                  *
+--***************************************************************************************************
+
+do
+	function textblox.getStringWidth (text, font)
+		local strLen = text:len() 
+		return  (strLen * font.charWidth) + (math.max(0, strLen-1) * font.kerning)
+	end
+	
+	
+	function textblox.print (text, xPos,yPos, fontObj, t_halign, t_valign, w, alpha)
+		return textblox.printExt (text, {x=xPos, y=yPos, font=fontObj, halign=t_halign, valign=t_valign, width, opacity=alpha})
+	end
+	
+	
+	function textblox.printExt (text, properties)
+		-- Setup
+		local x = properties["x"] or 400
+		local y = properties["y"] or 300
+		
+		local bind = properties["bind"] or textblox.BIND_SCREEN
+		
+		if  bind == textblox.BIND_LEVEL  then
+			x,y = graphX.worldToScreen(x,y)
+		end
+		
+		local t_halign = properties["halign"] or textblox.HALIGN_LEFT
+		local t_valign = properties["valign"] or textblox.VALIGN_TOP
+		local alpha = properties["opacity"] or 1.00
+		
+		local font = properties["font"] or textblox.FONT_DEFAULT
+		local width = properties["width"] or math.huge
+		
+		
+		local lineBreaks = 0
+		local charsOnLine = 0
+		local totalShownChars = 0
+		local currentLineWidth = 0
+		
+			
+		local totalWidth = 1
+		local totalHeight = 1
+		
+		
+		local startOfLine = 1
+		local fullLineWidth = 0
+		local charEndWidth = 0
+		local markupCount = 0
+		local i = 1
+				
+		local topmostY = 10000
+		local leftmostX = 10000
+		
+		-- Effects
+		local shakeMode = false
+		local waveMode = false
+		local currentColor = 0xFFFFFFFF
+		
+		
+		-- Determine number of characters per line
+		local numCharsPerLine = math.floor((width)/(font.charWidth + font.kerning))
+		local mostCharsLine = 0
+		
+		
+		-- Positioning loop
+		local lineWidths = {}
+		local totalLineBreaks = 0
+		
+		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
+		
+			local processPlaintext  = false
+		
+			-- Is a command
+			if  string.find(textChunk, "<.*>") ~= nil  then
+			
+				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
+				if  commandStr == nil  then
+					commandStr = string.match (textChunk, "[^<>%s]+")
+				end
+								
+				-- Line break
+				if  commandStr == "br"  then
+					lineWidths [lineBreaks] = charsOnLine*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
+					lineBreaks = lineBreaks + 1
+					totalLineBreaks = totalLineBreaks + 1
+					charsOnLine = 0
+				end
+				
+				if  commandStr == "gt"  then
+					textChunk = ">"
+					processPlaintext = true
+				end		
+				
+				if  commandStr == "lt"  then
+					textChunk = "<"
+					processPlaintext = true
+
+				end
+				
+				if  commandStr == "butt"  then
+					textChunk = "rockythechao"
+					processPlaintext = true
+				end
+				
+			-- Is plaintext
+			else
+				processPlaintext = true
+			end
+				
+
+			-- PROCESS PLAINTEXT
+			if  processPlaintext == true  then
+				string.gsub (textChunk, ".", function(c)
+					-- Increment position counters
+					charsOnLine = charsOnLine + 1
+					totalShownChars = totalShownChars + 1
+
+					
+					if  charsOnLine > numCharsPerLine + 1  then
+						lineWidths[lineBreaks] = (charsOnLine-1)*font.charWidth + math.max(0, charsOnLine-2)*font.kerning
+						lineBreaks = lineBreaks + 1
+						totalLineBreaks = totalLineBreaks + 1
+						charsOnLine = 0
+					end
+					
+					-- Get widest line
+					if  mostCharsLine < charsOnLine then
+						mostCharsLine = charsOnLine
+					end
+
+					return c
+				end)
+			end
+		end
+		lineWidths[lineBreaks] = (charsOnLine)*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
+
+		-- fix spacing issue on single-line prints
+		--if  totalLineBreaks == 0  then
+			mostCharsLine = mostCharsLine + 1
+			--lineWidths[0] = lineWidths[0] + font.charWidth + font.kerning
+		--end
+		
+		
+		-- Display loop
+		lineBreaks = 0
+		charsOnLine = 0
+		
+		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
+			
+			-- Is a command
+			local processPlaintext = false
+			
+			if  string.find(textChunk, "<.*>") ~= nil  then
+				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
+				if  commandStr == nil  then
+					commandStr = string.match (textChunk, "[^<>%s]+")
+				end
+				
+				--[[
+				if  commandStr ~= nil  then
+					if  amountStr ~= nil then
+						Text.windowDebug (commandStr..", "..tostring(amountStr))
+					else
+						Text.windowDebug (commandStr)
+					end
+				end
+				]]
+				
+				-- Line break
+				if  commandStr == "br"  then
+					lineBreaks = lineBreaks + 1
+					charsOnLine = 0
+				end
+
+				-- Greater than
+				if  commandStr == "gt"  then
+					textChunk = ">"
+					processPlaintext = true
+				end
+				
+				-- Greater than
+				if  commandStr == "lt"  then
+					textChunk = "<"
+					processPlaintext = true
+				end
+				
+				-- BUTT
+				if  commandStr == "butt"  then
+					textChunk = "rockythechao"
+					processPlaintext = true
+				end
+	
+	
+				-- Shake text
+				if  commandStr == "tremble"  then
+					shakeMode = true
+				end
+				if  commandStr == "/tremble"  then
+					shakeMode = false
+				end
+				
+				-- Wave text
+				if  commandStr == "wave"  then
+					waveMode = true
+				end
+				if  commandStr == "/wave"  then
+					waveMode = false
+				end
+			
+				-- Colored text
+				if  commandStr == "color"  then
+					currentColor = tonumber(amountStr)
+				end
+				
+				
+			-- Is plaintext
+			else
+				processPlaintext = true
+			end
+			
+			
+			-- Process the plaintext
+			if  processPlaintext == true  then
+				string.gsub (textChunk, ".", function(c)
+					
+					-- Increment position counters
+					charsOnLine = charsOnLine + 1
+					totalShownChars = totalShownChars + 1
+
+					
+					if  charsOnLine > numCharsPerLine + 1  then
+						lineBreaks = lineBreaks + 1
+						charsOnLine = 0
+					end
+					
+					-- Get widest line
+					if  mostCharsLine < charsOnLine then
+						mostCharsLine = charsOnLine
+					end
+
+					-- Ignore spaces
+					if  c ~= " " then
+
+						-- Determine position
+						currentLineWidth = math.max(0, charsOnLine-1) * font.charWidth    +   math.max(0, charsOnLine-2) * font.kerning
+						local xPos = x + currentLineWidth
+						local yPos = y + font.charHeight*lineBreaks
+						
+						
+						-- if different alignments, change those values
+						if	t_halign == textblox.HALIGN_RIGHT  then
+							xPos = x - lineWidths[lineBreaks] + currentLineWidth
+
+						elseif	t_halign == textblox.HALIGN_MID  then
+							xPos = x - 0.5*(lineWidths[lineBreaks]) + currentLineWidth
+						end
+
+
+						if	t_valign == textblox.VALIGN_BOTTOM  then
+							yPos = y + (lineBreaks - totalLineBreaks - 1)*font.charHeight
+
+						elseif t_valign == textblox.VALIGN_MID  then
+							yPos = y + (lineBreaks*font.charHeight)	- ((totalLineBreaks+1)*font.charHeight*0.5)
+						end
+
+						
+						-- Process visual effects
+						local xAffected = xPos
+						local yAffected = yPos
+											
+						if  waveMode == true  then
+							yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)
+						end
+						
+						if  shakeMode == true  then
+							local shakeX = math.max(0.5, font.charWidth * 0.125)
+							local shakeY = math.max(0.5, font.charHeight * 0.125)
+							
+							xAffected = xAffected + math.random(-1*shakeX, shakeX)
+							yAffected = yAffected + math.random(-1*shakeY, shakeY)
+						end
+						
+						-- Finally, draw the image
+						font:drawCharImage (c, xAffected, yAffected, alpha)
+					end
+					
+					return c
+				end)
+			end
+			--windowDebug (textChunk)
+		end
+		
+		totalWidth = mostCharsLine * (font.kerning + font.charWidth) - font.kerning
+		totalHeight = font.charHeight * lineBreaks
+		
+		return totalWidth, totalHeight, lineBreaks, lineWidths
+	end
+end
+
 
 
 
@@ -446,7 +752,7 @@ do
 		return thisTextBlock
 	end
 
-	function textblox.createBlock (x,y, textStr, properties)
+	function textblox.Block (x,y, textStr, properties)
 		return TextBlock.create (x,y, textStr, properties)
 	end
 	
@@ -1122,257 +1428,6 @@ do
 	end
 end
 
-
-
---***************************************************************************************************
---                                                                                                  *
---              PRINT FUNCTIONS																	    *
---                                                                                                  *
---***************************************************************************************************
-
-do
-	function textblox.getStringWidth (text, font)
-		local strLen = text:len() 
-		return  (strLen * font.charWidth) + (math.max(0, strLen-1) * font.kerning)
-	end
-	
-	
-	function textblox.print (text, xPos,yPos, fontObj, t_halign, t_valign, w, alpha)
-		return textblox.printExt (text, {x=xPos, y=yPos, font=fontObj, halign=t_halign, valign=t_valign, width, opacity=alpha})
-	end
-	
-	
-	function textblox.printExt (text, properties)
-		-- Setup
-		local x = properties["x"] or 400
-		local y = properties["y"] or 300
-		
-		local bind = properties["bind"] or textblox.BIND_SCREEN
-		
-		if  bind == textblox.BIND_LEVEL  then
-			x,y = graphX.worldToScreen(x,y)
-		end
-		
-		local t_halign = properties["halign"] or textblox.HALIGN_LEFT
-		local t_valign = properties["valign"] or textblox.VALIGN_TOP
-		local alpha = properties["opacity"] or 1.00
-		
-		local font = properties["font"] or textblox.FONT_DEFAULT
-		local width = properties["width"] or math.huge
-		
-		
-		local lineBreaks = 0
-		local charsOnLine = 0
-		local totalShownChars = 0
-		local currentLineWidth = 0
-		
-			
-		local totalWidth = 1
-		local totalHeight = 1
-		
-		
-		local startOfLine = 1
-		local fullLineWidth = 0
-		local charEndWidth = 0
-		local markupCount = 0
-		local i = 1
-				
-		local topmostY = 10000
-		local leftmostX = 10000
-		
-		-- Effects
-		local shakeMode = false
-		local waveMode = false
-		local currentColor = 0xFFFFFFFF
-		
-		
-		-- Determine number of characters per line
-		local numCharsPerLine = math.floor((width)/(font.charWidth + font.kerning))
-		local mostCharsLine = 0
-		
-		
-		-- Positioning loop
-		local lineWidths = {}
-		local totalLineBreaks = 0
-		
-		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
-		
-			-- Is a command
-			if  string.find(textChunk, "<.*>") ~= nil  then
-				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
-				if  commandStr == nil  then
-					commandStr = string.match (textChunk, "[^<>%s]+")
-				end
-								
-				-- Line break
-				if  commandStr == "br"  then
-					lineWidths [lineBreaks] = charsOnLine*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
-					lineBreaks = lineBreaks + 1
-					totalLineBreaks = totalLineBreaks + 1
-					charsOnLine = 0
-				end
-		
-			-- Is plaintext
-			else
-				string.gsub (textChunk, ".", function(c)
-					-- Increment position counters
-					charsOnLine = charsOnLine + 1
-					totalShownChars = totalShownChars + 1
-
-					
-					if  charsOnLine > numCharsPerLine + 1  then
-						lineWidths[lineBreaks] = (charsOnLine-1)*font.charWidth + math.max(0, charsOnLine-2)*font.kerning
-						lineBreaks = lineBreaks + 1
-						totalLineBreaks = totalLineBreaks + 1
-						charsOnLine = 0
-					end
-					
-					-- Get widest line
-					if  mostCharsLine < charsOnLine then
-						mostCharsLine = charsOnLine
-					end
-
-					return c
-				end)
-			end
-		end
-		lineWidths[lineBreaks] = (charsOnLine)*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
-
-		-- fix spacing issue on single-line prints
-		--if  totalLineBreaks == 0  then
-			mostCharsLine = mostCharsLine + 1
-			--lineWidths[0] = lineWidths[0] + font.charWidth + font.kerning
-		--end
-		
-		
-		-- Display loop
-		lineBreaks = 0
-		charsOnLine = 0
-		
-		for textChunk in string.gmatch(text, "<*[^<>]+>*")	do
-			
-			-- Is a command
-			if  string.find(textChunk, "<.*>") ~= nil  then
-				local commandStr, amountStr = string.match (textChunk, "([^<>%s]+) ([^<>%s]+)")
-				if  commandStr == nil  then
-					commandStr = string.match (textChunk, "[^<>%s]+")
-				end
-				
-				--[[
-				if  commandStr ~= nil  then
-					if  amountStr ~= nil then
-						Text.windowDebug (commandStr..", "..tostring(amountStr))
-					else
-						Text.windowDebug (commandStr)
-					end
-				end
-				]]
-				
-				-- Line break
-				if  commandStr == "br"  then
-					lineBreaks = lineBreaks + 1
-					charsOnLine = 0
-				end
-				
-				-- Shake text
-				if  commandStr == "tremble"  then
-					shakeMode = true
-				end
-				if  commandStr == "/tremble"  then
-					shakeMode = false
-				end
-				
-				-- Wave text
-				if  commandStr == "wave"  then
-					waveMode = true
-				end
-				if  commandStr == "/wave"  then
-					waveMode = false
-				end
-			
-				-- Colored text
-				if  commandStr == "color"  then
-					currentColor = tonumber(amountStr)
-				end
-				
-				
-			-- Is plaintext
-			else
-				string.gsub (textChunk, ".", function(c)
-					
-					-- Increment position counters
-					charsOnLine = charsOnLine + 1
-					totalShownChars = totalShownChars + 1
-
-					
-					if  charsOnLine > numCharsPerLine + 1  then
-						lineBreaks = lineBreaks + 1
-						charsOnLine = 0
-					end
-					
-					-- Get widest line
-					if  mostCharsLine < charsOnLine then
-						mostCharsLine = charsOnLine
-					end
-
-					-- Ignore spaces
-					if  c ~= " " then
-
-						-- Determine position
-						currentLineWidth = math.max(0, charsOnLine-1) * font.charWidth    +   math.max(0, charsOnLine-2) * font.kerning
-						local xPos = x + currentLineWidth
-						local yPos = y + font.charHeight*lineBreaks
-						
-						
-						-- if different alignments, change those values
-						if	t_halign == textblox.HALIGN_RIGHT  then
-							xPos = x - lineWidths[lineBreaks] + currentLineWidth
-
-						elseif	t_halign == textblox.HALIGN_MID  then
-							xPos = x - 0.5*(lineWidths[lineBreaks]) + currentLineWidth
-						end
-
-
-						if	t_valign == textblox.VALIGN_BOTTOM  then
-							yPos = y + (lineBreaks - totalLineBreaks - 1)*font.charHeight
-
-						elseif t_valign == textblox.VALIGN_MID  then
-							yPos = y + (lineBreaks*font.charHeight)	- ((totalLineBreaks+1)*font.charHeight*0.5)
-						end
-
-						
-						-- Process visual effects
-						local xAffected = xPos
-						local yAffected = yPos
-											
-						if  waveMode == true  then
-							yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)
-						end
-						
-						if  shakeMode == true  then
-							local shakeX = math.max(0.5, font.charWidth * 0.125)
-							local shakeY = math.max(0.5, font.charHeight * 0.125)
-							
-							xAffected = xAffected + math.random(-1*shakeX, shakeX)
-							yAffected = yAffected + math.random(-1*shakeY, shakeY)
-						end
-						
-						-- Finally, draw the image
-						font:drawCharImage (c, xAffected, yAffected, alpha)
-					end
-					
-					return c
-				end)
-			end
-			--windowDebug (textChunk)
-		end
-		
-		totalWidth = mostCharsLine * (font.kerning + font.charWidth) - font.kerning
-		totalHeight = font.charHeight * lineBreaks
-		
-		return totalWidth, totalHeight, lineBreaks, lineWidths
-	end
-end
 
 
 
