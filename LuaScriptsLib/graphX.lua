@@ -7,7 +7,6 @@
 --***************************************************************************************
 
 local graphX = {}
-local vectr = loadSharedAPI ("vectr")
 local mathematX = loadSharedAPI ("mathematX")
 
 	graphX.resourcePath     = "..\\..\\..\\LuaScriptsLib\\graphX\\"

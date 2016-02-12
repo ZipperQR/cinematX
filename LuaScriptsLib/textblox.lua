@@ -31,7 +31,8 @@ textblox.overrideMessageBox = false
 
 textblox.currentMessage = nil
 
-		
+
+	
 		
 
 --***************************************************************************************************
@@ -55,6 +56,7 @@ textblox.currentMessage = nil
 		
 		return textblox.resourcePath..filename
 	end
+
 
 
 
@@ -192,6 +194,11 @@ do
 end
 
 
+
+
+
+
+
 --***************************************************************************************************
 --                                                                                                  *
 --              DEFAULT FONTS AND RESOURCES												    		*
@@ -199,7 +206,7 @@ end
 --***************************************************************************************************
 
 do 
-	textblox.FONT_DEFAULT = textblox.createFont (textblox.FONTTYPE_DEFAULT, 4)  
+	textblox.FONT_DEFAULT = textblox.Font (textblox.FONTTYPE_DEFAULT, 4)  
 
 	textblox.IMGNAME_DEFAULTSPRITEFONT 		= textblox.getPath ("font_default.png")
 	textblox.IMGNAME_DEFAULTSPRITEFONTX2 	= textblox.getPath ("font_default_x2.png")
@@ -235,15 +242,16 @@ do
 	textblox.IMGREF_BUBBLE_BORDER_DR	 	= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_DR)
 	
 	
-	textblox.FONT_SPRITEDEFAULT 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 8, 	charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT, 		kerning = 0})
-	textblox.FONT_SPRITEDEFAULTX2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONTX2, 	kerning = 0})
-	textblox.FONT_SPRITEDEFAULT2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 8, 	charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2, 	kerning = 0})
-	textblox.FONT_SPRITEDEFAULT2X2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2X2, 	kerning = 0})
-	textblox.FONT_SPRITEDEFAULT3 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 9, 	charHeight = 9, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3, 	kerning = 0})
-	textblox.FONT_SPRITEDEFAULT3X2 	= textblox.createFont (textblox.FONTTYPE_SPRITE, {charWidth = 18, 	charHeight = 18, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3X2, 	kerning = -2})
+	textblox.FONT_SPRITEDEFAULT 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 8, 		charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT, 		kerning = 0})
+	textblox.FONT_SPRITEDEFAULTX2 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONTX2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT2 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 8, 		charHeight = 8, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT2X2 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2X2, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT3 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 9, 		charHeight = 9, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT3X2 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 18, 	charHeight = 18, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3X2, 	kerning = -2})
 end
 
 
+	
 
 
 --***************************************************************************************************
@@ -549,6 +557,7 @@ do
 end
 
 
+	
 
 
 --***************************************************************************************************
@@ -1429,6 +1438,7 @@ do
 end
 
 
+		
 
 
 --***************************************************************************************************
@@ -1498,6 +1508,9 @@ do
 	end
 end	
 
+
+
+	
 
 
 --***************************************************************************************************

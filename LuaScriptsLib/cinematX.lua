@@ -5,7 +5,8 @@
 --  Documentation: http://engine.wohlnet.ru/pgewiki/CinematX.lua                        *
 --  Discussion thread: http://talkhaus.raocow.com/viewtopic.php?f=36&t=15516            *
 --                                                                                      *
---***************************************************************************************
+--***************************************************************************************				
+
  
 local cinematX = {} --Package table
 local graphX, textblox, mathX, eventu, npcconfig, colliders, inputs;
@@ -108,7 +109,7 @@ do
 	cinematX.ANIMSTATE_ATTACK6       =  i; i=i+1;
 	cinematX.ANIMSTATE_ATTACK7       =  i; i=i+1;
 	cinematX.ANIMSTATE_CLIMB         =  i; i=i+1;  -- 31
-	cinematX.ANIMSTATE_TOPPRESET =  i; i=i+1;
+	cinematX.ANIMSTATE_TOPPRESET     =  i; i=i+1;
    
    
 	-- Actor animation state table
@@ -2312,7 +2313,7 @@ do
 		cinematX.subtitleFontProps ["image"] = cinematX.IMGREF_FONT1
 		cinematX.subtitleFontProps ["kerning"] = -1
 	   
-		cinematX.subtitleFont = textblox.createFont (textblox.FONTTYPE_SPRITE, cinematX.subtitleFontProps)
+		cinematX.subtitleFont = textblox.Font (textblox.FONTTYPE_SPRITE, cinematX.subtitleFontProps)
 	   
 	   
 		cinematX.subtitleBoxProps = {}
@@ -2334,7 +2335,7 @@ do
 		cinematX.subtitleBoxProps ["visible"] = true
 		cinematX.subtitleBoxProps ["autoClose"] = false
 	   
-		cinematX.subtitleBoxBlock = textblox.createBlock (8, 468+32, "", cinematX.subtitleBoxProps)
+		cinematX.subtitleBoxBlock = textblox.Block (8, 468+32, "", cinematX.subtitleBoxProps)
 	   
 	   
 		-- Has this function been called?
@@ -4553,7 +4554,7 @@ do
 				cinematX.triggerDialogSpeaker (speakerActor, speakTime)
 			end
 			]]
-			returnObj = textblox.createBlock (x,y, text, bloxProps)
+			returnObj = textblox.Block (x,y, text, bloxProps)
 	   
 		end
 	   
