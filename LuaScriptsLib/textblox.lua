@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua																		*
---  v0.2.2                                                      						*
+--  v0.2.3                                                      						*
 --  Documentation: ___											  						*
 --                                                                                      *
 --***************************************************************************************
@@ -9,7 +9,7 @@
 local textblox = {} --Package table
 local graphX = loadSharedAPI("graphX");
 local inputs = loadSharedAPI("inputs");
-
+local rng = API.load("rng");
 
 function textblox.onInitAPI() --Is called when the api is loaded by loadAPI.
 	--register event handler
@@ -535,8 +535,8 @@ do
 							local shakeX = math.max(0.5, font.charWidth * 0.125)
 							local shakeY = math.max(0.5, font.charHeight * 0.125)
 							
-							xAffected = xAffected + math.random(-1*shakeX, shakeX)
-							yAffected = yAffected + math.random(-1*shakeY, shakeY)
+							xAffected = xAffected + rng.randomInt(-1*shakeX, shakeX)
+							yAffected = yAffected + rng.randomInt(-1*shakeY, shakeY)
 						end
 						
 						-- Finally, draw the image
@@ -812,8 +812,8 @@ do
 		
 	
 		-- Get shake offset
-		local shakeX = math.random (-12, 12) * (self.shakeFrames/8)
-		local shakeY = math.random (-12, 12) * (self.shakeFrames/8)		
+		local shakeX = rng.randomInt (-12, 12) * (self.shakeFrames/8)
+		local shakeY = rng.randomInt (-12, 12) * (self.shakeFrames/8)		
 		
 		
 		-- Get alignment and width based on scale mode
@@ -1022,8 +1022,7 @@ do
 	
 	function TextBlock:playTypeSound ()
 		if  Audio.SfxIsPlaying(self.typeUsedChannel) == 0  and  #self.typeSounds > 0  then
-			local sndIndex = math.random( #self.typeSounds )
-			self.typeUsedChannel = Audio.SfxPlayCh (-1, self.typeSoundChunks [sndIndex], 0)
+			self.typeUsedChannel = Audio.SfxPlayCh (-1, rng.irandomEntry(self.typeSoundChunks), 0)
 		end
 	end
 	
