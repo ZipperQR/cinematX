@@ -41,7 +41,7 @@ local mathematX = {}
 		local vx = x
 		local vy = y
 	   
-		local length = magnitude(x,y);
+		local length = mathematX.magnitude(x,y);
 
 		-- normalize vector
 		vx = vx/length;
