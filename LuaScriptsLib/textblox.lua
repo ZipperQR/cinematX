@@ -1,8 +1,8 @@
 --***************************************************************************************
 --                                                                                      *
--- 	textblox.lua																		*
---  v0.2.3                                                      						*
---  Documentation: ___											  						*
+-- 	textblox.lua                                                                        *
+--  v0.2.4                                                                              *
+--  Documentation: http://wohlsoft.ru/pgewiki/Textblox.lua                              *
 --                                                                                      *
 --***************************************************************************************
 
@@ -133,7 +133,7 @@ do
 	end
 
 	
-	function Font:drawCharImage (character, x,y, opacity, color)
+	function Font:drawCharImage (character, x,y, w,h, italic,bold, opacity,color)
 		
 		if  color == nil  then
 			color = 0xFFFFFFFF
@@ -311,6 +311,8 @@ do
 		local leftmostX = 10000
 		
 		-- Effects
+		local italicMode = false
+		local boldMode = false
 		local shakeMode = false
 		local waveMode = false
 		local currentColor = 0xFFFFFFFF
@@ -319,6 +321,8 @@ do
 		-- Determine number of characters per line
 		local numCharsPerLine = math.floor((width)/(font.charWidth + font.kerning))
 		local mostCharsLine = 0
+		
+		text = textblox.formatTextForWrapping (text, numCharsPerLine, false)
 		
 		
 		-- Positioning loop
@@ -449,6 +453,23 @@ do
 					processPlaintext = true
 				end
 	
+
+
+				-- Bold text
+				if  commandStr == "b"  then
+					boldMode = true
+				end
+				if  commandStr == "/b"  then
+					boldMode = false
+				end
+	
+				-- Italic text
+				if  commandStr == "i"  then
+					italicMode = true
+				end
+				if  commandStr == "/i"  then
+					italicMode = false
+				end
 	
 				-- Shake text
 				if  commandStr == "tremble"  then
@@ -526,6 +547,8 @@ do
 						-- Process visual effects
 						local xAffected = xPos
 						local yAffected = yPos
+						local wAffected = 1
+						local hAffected = 1
 											
 						if  waveMode == true  then
 							yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)
@@ -540,7 +563,7 @@ do
 						end
 						
 						-- Finally, draw the image
-						font:drawCharImage (c, xAffected, yAffected, alpha)
+						font:drawCharImage (c, xAffected, yAffected, wAffected, hAffected, italicMode,boldMode, alpha)
 					end
 					
 					return c
@@ -777,7 +800,7 @@ do
 			addSlashN = false
 		end
 		
-		local wrappedText = textblox.formatDialogForWrapping (self.text, self:getCharsPerLine (), addSlashN)
+		local wrappedText = textblox.formatTextForWrapping (self.text, self:getCharsPerLine (), addSlashN)
 		return wrappedText
 	end
 	
@@ -1267,7 +1290,7 @@ do
 	end
 	
 	
-	function textblox.formatDialogForWrapping (text, wrapChars, addSlashN)
+	function textblox.formatTextForWrapping (text, wrapChars, addSlashN)
 		
 		-- Setup
 		local newString = text
