@@ -3,6 +3,9 @@ Things that need to be done before the stable 0.8 release:
 (V = check, % = in progress/needs more testing)
 
 URGENT:
+- Actor blinking
+- Get depth drawing working for textblox
+- Coroutine abortion bug
 % Get cinematX suite loadable on the overworld
 % Actor animations/movement/AI when they don't have gravity
 - Actors behave strangely near walls/get stuck
@@ -17,7 +20,7 @@ V Actor invisible states
 % Actor intangible states
 % Fix warp pipe fading
 V Nogl progress bars
-- Fix graphX Ext functions
+V Fix graphX Ext functions
 V fix getActorFromKey
 - figure out what the deal is with .name vs .nameString
 % textblox wrapping (occasional extra line breaks, indentation)

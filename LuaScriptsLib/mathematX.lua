@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 --  mathematX.lua                                                                       *
---  v0.1                                                                                *
+--  v0.2                                                                                *
 --                                                                                      *
 --***************************************************************************************
  
@@ -27,6 +27,19 @@ local mathematX = {}
 		return  math.min(1.00000, math.max(0.0000, math.abs(amountVal-minVal) / math.abs(maxVal - minVal)))
 	end
 
+
+	function mathematX.invLerpUnclamped (minVal, maxVal, amountVal)                   
+		return  (amountVal-minVal) / (maxVal - minVal)
+	end
+
+	function mathematX.invLerpCycled (minVal, maxVal, amountVal)                   
+		local raw = (amountVal-minVal) / (maxVal - minVal)		
+		raw = raw%1
+		
+		return raw
+	end
+	
+	
 
 	function mathematX.magnitude (x,y)
 		local vx = x
@@ -71,6 +84,13 @@ local mathematX = {}
 
 	function mathematX.hexStringToInt (hexString)
 		return tonumber(hexString, 16)
+	end
+
+	function mathematX.hexColorToTable (hexVal)
+		local stringVal = mathematX.intToHexString (hexVal)
+		local r, g, b, a = tonumber("0x"..stringVal:sub(1,2)), tonumber("0x"..stringVal:sub(3,4)), tonumber("0x"..stringVal:sub(5,6)), tonumber("0x"..stringVal:sub(7,8))
+		
+		return {r/255, g/255, b/255, a/255};
 	end
 
 	

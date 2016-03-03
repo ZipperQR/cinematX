@@ -1,7 +1,7 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua                                                                        *
---  v0.2.4                                                                              *
+--  v0.2.5                                                                              *
 --  Documentation: http://wohlsoft.ru/pgewiki/Textblox.lua                              *
 --                                                                                      *
 --***************************************************************************************
@@ -276,6 +276,7 @@ do
 		-- Setup
 		local x = properties["x"] or 400
 		local y = properties["y"] or 300
+		local z = properties["z"] or 0
 		
 		local bind = properties["bind"] or textblox.BIND_SCREEN
 		
@@ -936,14 +937,14 @@ do
 		
 
 		-- Display text
-		self.autoWidth, self.autoHeight = textblox.print   (textToShow, 
-															textX + self.font.charWidth*0.5, 
-															textY - self.font.charHeight*0.5,
-															self.font,
-															self.halign,
-															self.valign,
-															self.width,
-															self.textAlpha)
+		self.autoWidth, self.autoHeight = textblox.printExt (textToShow, {x=textX + self.font.charWidth*0.5, 
+																		  y=textY - self.font.charHeight*0.5,
+																		  font=self.font,
+																		  bind=self.bind,
+																		  width=self.autoWidth,
+																		  halign=self.halign,
+																		  valign=self.valign,
+																		  opacity=self.textAlpha})
 	end
 
 	

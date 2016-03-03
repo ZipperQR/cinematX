@@ -1,13 +1,13 @@
 --***************************************************************************************
 --                                                                                      *
 --  graphX.lua                                                                          *
---  v0.3c                                                                               *
+--  v0.4                                                                                *
 --  Based on colliders.lua by Hoeloe                                                    *
 --                                                                                      *
 --***************************************************************************************
 
 local graphX = {}
-local mathematX = loadSharedAPI ("mathematX")
+local mathX = loadSharedAPI ("mathematX")
 
 	graphX.resourcePath     = "..\\..\\..\\LuaScriptsLib\\graphX\\"
 	graphX.resourcePathOver = "..\\..\\LuaScriptsLib\\graphX\\"
@@ -58,11 +58,79 @@ local mathematX = loadSharedAPI ("mathematX")
 	end
 	
 	
+	
+	
+	--***************************************************************************************************
+	--                                                                                                  *
+	--              MISC CALCULATIONS                                                                   *
+	--                                                                                                  *
+	--***************************************************************************************************
+	
+		function circleToTris(x,y,r, detail)
+		--local debugString = ""
+		
+		if  detail == nil  then
+			detail = 1
+		end
+		
+		local x1 = x
+		local y1 = y;
+		local pts = {};
+		
+		local m = math.ceil(math.sqrt(r/(1/detail)));
+		if(m < 1) then m = 1; end
+		local s = (math.pi/2)/m;
+		local ind = 1;
+		local xmult = 1;
+		local ymult = -1;
+		for n=1,4 do
+			local lx = 0;
+			local ly = 1;
+			for i=1,m do
+				local xs = math.cos((math.pi/2)-s*i);
+				local ys = math.sin((math.pi/2)-s*i);
+				pts[ind] = x1;
+				pts[ind+1] = y1;
+				pts[ind+2] = x1+xmult*r*lx;
+				pts[ind+3] = y1+ymult*r*ly;
+				pts[ind+4] = x1+xmult*r*xs;
+				pts[ind+5] = y1+ymult*r*ys;
+				ind = ind+6;
+				lx = xs;
+				ly = ys;
+			end
+			if xmult == 1 then
+				if ymult == -1 then
+					ymult = 1;
+				elseif ymult == 1 then
+					xmult = -1;
+				end
+			elseif xmult == -1 then
+				if ymult == -1 then
+					xmult = 1;
+				elseif ymult == 1 then
+					ymult = -1;
+				end
+			end
+		end
+		
+		--[[
+		for i=1,#pts do
+			debugString = debugString..tostring(pts[i])..", "..tostring(pts[i+1]).."\n"
+		end
+		windowDebug (tostring(#pts).."\n\n"..debugString)
+		]]
+		return pts;
+	end
+	
+	
+	
 	--***************************************************************************************************
 	--                                                                                                  *
 	--              PRIMITIVE DRAWING FUNCTIONS                                                         *
 	--                                                                                                  *
 	--***************************************************************************************************
+	
 	
 	function graphX.boxLevel (x,y,w,h, col, tex)
 		local x1,y1 = graphX.worldToScreen (x, y);
@@ -98,16 +166,38 @@ local mathematX = loadSharedAPI ("mathematX")
 	
 	
 	function graphX.boxLevelExt (x,y,w,h, properties)
-		local x1,y1 = graphX.worldToScreen (x, y);
-		graphX.boxScreenExt (x1,y1,w,h, properties)
+		if properties == nil  then
+			properties = {isSceneCoords=true}
+		else
+			properties["isSceneCoords"] = true
+		end
+		
+		graphX.boxExt (x,y,w,h, properties)
 	end
 	
-	function graphX.boxScreenExt (x,y,w,h, properties)			
+	function graphX.boxScreenExt (x,y,w,h, properties)
+		if properties == nil  then
+			properties = {isSceneCoords=false}
+		else
+			properties["isSceneCoords"] = false
+		end
+		
+		graphX.boxExt (x,y,w,h, properties)
+	end
+	
+	function graphX.boxExt (x,y,w,h, properties)
 		local x1,y1 = x,y;
+		if  properties ~= nil  then
+			if properties["isSceneCoords"] == true  then
+				x1,y1 = graphX.worldToScreen (x1, y1);
+			end
+		end
+		
 		local pts = {};
 		pts[1] = x1; 	pts[2] = y1;
 		pts[3] = x1+w;	pts[4] = y1;
 		pts[5] = x1;	pts[6] = y1+h;
+		
 		pts[7] = x1;	pts[8] = y1+h;
 		pts[9] = x1+w;	pts[10] = y1+h;
 		pts[11] = x1+w; pts[12] = y1;
@@ -118,15 +208,35 @@ local mathematX = loadSharedAPI ("mathematX")
 	
 	
 	function graphX.quadLevelExt (points, properties)
-		for i=1, #points, 2 do 
-			local x1,y1 = graphX.worldToScreen (points[i], points[i+1]);
-			points[i],points[i+1] = x1,y1
+		if properties == nil  then
+			properties = {isSceneCoords=true}
+		else
+			properties["isSceneCoords"] = true
 		end
 
 		graphX.quadScreenExt (points, properties)
 	end
 	
 	function graphX.quadScreenExt (points, properties)
+		if properties == nil  then
+			properties = {isSceneCoords=false}
+		else
+			properties["isSceneCoords"] = false
+		end
+
+		graphX.quadExt (points, properties)
+	end
+	
+	function graphX.quadExt (points, properties)
+		if  properties ~= nil  then
+			if properties["isSceneCoords"] == true  then
+				for i=1, #points, 2 do 
+					local x1,y1 = graphX.worldToScreen (points[i], points[i+1]);
+					points[i],points[i+1] = x1,y1
+				end
+			end
+		end
+	
 		local x1,x2,x3,x4 = points[1],points[3],points[5],points[7];
 		local y1,y2,y3,y4 = points[2],points[4],points[6],points[8];
 		
@@ -140,7 +250,21 @@ local mathematX = loadSharedAPI ("mathematX")
 		
 		graphX.polyExt (pts, properties)
 	end
+
 	
+	
+	function graphX.circleExt (x,y,r, properties)
+		local x1,y1 = x,y;
+		if  properties ~= nil  then
+			if properties["isSceneCoords"] == true  then
+				x1,y1 = graphX.worldToScreen (x1, y1);
+			end
+		end
+		
+		local pts = circleToTris (x1,y1,r)
+		--pts[#pts+1] = pts[#pts]
+		graphX.polyExt (pts, properties)
+	end
 	
 	
 	function graphX.polyExt (points, properties)
@@ -157,6 +281,9 @@ local mathematX = loadSharedAPI ("mathematX")
 		if  properties ~= nil  then
 			uAdd = properties["u"] or 0
 			vAdd = properties["v"] or 0
+			
+			z = properties["z"] or 1.0
+			
 			tex = properties["tex"]
 			texAngle = properties["texAngle"] or 0
 			texScaleX = properties["texScaleX"] or properties["texScale"] or 1
@@ -167,12 +294,15 @@ local mathematX = loadSharedAPI ("mathematX")
 			
 			if  tile == nil  then
 				tile = false
-			end			
+			end
 		end
 		
 		
+		-- Convert color to new format for new gl draw function
+		newCol = mathX.hexColorToTable (col)
+		
+		
 		-- Get UV bounds
-		Graphics.glSetTextureRGBA (tex, col);
 		local x1,x2,y1,y2 = points[1],points[1],points[2],points[2];
 		
 		for i=1, #points, 2 do 
@@ -197,6 +327,8 @@ local mathematX = loadSharedAPI ("mathematX")
 		-- Calculate texture positioning
 		local shapeW,shapeH = x2-x1, y2-y1;
 		local xMid,yMid = (x1+x2)*0.5, (y1+y2)*0.5;
+
+
 		
 		local pixels = {};
 		local texW,texH = 2,2;
@@ -212,12 +344,13 @@ local mathematX = loadSharedAPI ("mathematX")
 
 		local texL,texR,texT,texB = x1,x2,y1,y2;
 		
+
+		texW,texH = texW*texScaleX, texH*texScaleY;
 		
 		if  tile == false  then
 			texW,texH = shapeW, shapeH;		
 		end
 		
-		texW,texH = texW*texScaleX, texH*texScaleY;
 		
 		
 		texL = xMid - texW*(0.5)--+uAdd);
@@ -230,28 +363,37 @@ local mathematX = loadSharedAPI ("mathematX")
 		end
 		
 		
+		-- Calculate non-rotated uvs
+		local uvs = {}
+		for i=1, (#points), 2  do
+			local rotX = points[i]-- - xMid;
+			local rotY = points[i+1]-- - yMid;
+			
+			local newU, newV = mathX.invLerpUnclamped (texL,texR, rotX), mathX.invLerpUnclamped (texT,texB, rotY);
+			
+			
+			uvs[i] = newU + uAdd;
+			uvs[i+1] = newV + vAdd;
+		end		
+		
+		
 		-- Calculate rotation
 		local angleAdd = (texAngle) * (math.pi/180);
 		local cosMult, sinMult = math.cos(angleAdd), math.sin(angleAdd)
 		
-		-- Determine UVs
-		local uvs = {}
+		
+		-- Rotate UVs
 		for i=1, (#points), 2  do
-			local rotX = xMid + cosMult * (points[i] - xMid) - sinMult * (points[i+1] - yMid);
-			local rotY = yMid + sinMult * (points[i] - xMid) + cosMult * (points[i+1] - yMid);
-			
-			local newU, newV = mathematX.invLerp (texL,texR, rotX), mathematX.invLerp (texT,texB, rotY);
+			local newU = 0.5 + cosMult * (uvs[i] - 0.5) - sinMult * (uvs[i+1] - 0.5);
+			local newV = 0.5 + sinMult * (uvs[i] - 0.5) + cosMult * (uvs[i+1] - 0.5);			
 			
 			uvs[i] = newU;
 			uvs[i+1] = newV;
-			
-			--Text.print (string.format("%.2f", uvs[i])..", "..string.format("%.2f", uvs[i+1]), 4, 8, 120+10*i)
 		end
 		
 
 		-- Draw the poly
-		Graphics.glDrawTriangles (points, uvs, (#points + 1)/2);
-		Graphics.glSetTextureRGBA (nil, 0xFFFFFFFF);
+		Graphics.glDraw {vertexCoords=points, textureCoords=uvs, texture=tex, priority=z, color=newCol}
 	end
 
 	
@@ -273,48 +415,7 @@ local mathematX = loadSharedAPI ("mathematX")
 
 
 
-	function circleToTris(x,y,r)
-		local x1 = x
-		local y1 = y;
-		local pts = {};
-		local m = math.ceil(math.sqrt(r));
-		if(m < 1) then m = 1; end
-		local s = (math.pi/2)/m;
-		local ind = 0;
-		local xmult = 1;
-		local ymult = -1;
-		for n=1,4 do
-			local lx = 0;
-			local ly = 1;
-			for i=1,m do
-				local xs = math.cos((math.pi/2)-s*i);
-				local ys = math.sin((math.pi/2)-s*i);
-				pts[ind] = x1;
-				pts[ind+1] = y1;
-				pts[ind+2] = x1+xmult*r*lx;
-				pts[ind+3] = y1+ymult*r*ly;
-				pts[ind+4] = x1+xmult*r*xs;
-				pts[ind+5] = y1+ymult*r*ys;
-				ind = ind+6;
-				lx = xs;
-				ly = ys;
-			end
-			if xmult == 1 then
-				if ymult == -1 then
-					ymult = 1;
-				elseif ymult == 1 then
-					xmult = -1;
-				end
-			elseif xmult == -1 then
-				if ymult == -1 then
-					xmult = 1;
-				elseif ymult == 1 then
-					ymult = -1;
-				end
-			end
-		end
-		return pts;
-	end
+
 
 	
 
