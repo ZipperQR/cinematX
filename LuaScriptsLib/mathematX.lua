@@ -1,12 +1,23 @@
 --***************************************************************************************
 --                                                                                      *
 --  mathematX.lua                                                                       *
---  v0.2                                                                                *
+--  v0.3                                                                                *
 --                                                                                      *
 --***************************************************************************************
+ local vectr = API.load ("vectr")
+ 
  
 local mathematX = {}
 
+	function mathematX.sign (number)
+		if  number > 0  then
+			return 1;
+		elseif  number < 0  then
+			return -1;
+		else
+			return 0;
+		end
+	end
 
 	function mathematX.dirSign (direction)
 		local dirMult = -1
@@ -18,6 +29,21 @@ local mathematX = {}
 	end
 
 
+	function mathematX.wrap (minVal, maxVal, value)
+		local newVal = value
+		local size = maxVal - minVal
+		local wrapAmount = 0
+		if      value > maxVal  then
+			wrapAmount = math.abs(value-maxVal)%size
+			newVal = minVal + wrapAmount
+		elseif  value < minVal  then
+			wrapAmount = math.abs(minVal-value)%size
+			newVal = maxVal - wrapAmount
+		end
+		return newVal
+	end
+	
+	
 	function mathematX.lerp (minVal, maxVal, percentVal)
 		return (1-percentVal) * minVal + percentVal*maxVal;
 	end
@@ -38,9 +64,37 @@ local mathematX = {}
 		
 		return raw
 	end
-	
-	
 
+	
+	function mathematX.tableMin (t)
+		if #t == 0 then return nil, nil end
+		local key, value = 1, t[1]
+		for i = 2, #t do
+			if t[i] < value then
+				key, value = i, t[i]
+			end
+		end
+		return key, value
+	end
+	
+	function mathematX.tableMax (t)
+		if #t == 0 then return nil, nil end
+		local key, value = 1, t[1]
+		for i = 2, #t do
+			if t[i] > value then
+				key, value = i, t[i]
+			end
+		end
+		return key, value
+	end
+
+	function mathematX.tableMinMax (t)
+		local minI, minVal = mathematX.tableMin (t)
+		local maxI, maxVal = mathematX.tableMax (t)
+		return minI, minVal, maxI, maxVal
+	end
+	
+	
 	function mathematX.magnitude (x,y)
 		local vx = x
 		local vy = y
@@ -49,7 +103,10 @@ local mathematX = {}
 		return length
 	end
 
-
+	function mathematX.angle (x,y)
+		return math.deg (math.atan2 (y,x)) - 90
+	end
+	
 	function mathematX.normalize (x, y)
 		local vx = x
 		local vy = y
@@ -64,6 +121,46 @@ local mathematX = {}
 	end
 
 
+	function mathematX.rotatePoint (ptX, ptY, midX,midY, angle)
+		v = vectr2.v2(0)
+		v.x = ptX-x;
+		v.y = ptY-y;
+		v = v:rotate(angle);
+		return v.x,v.y	
+	end
+	
+	function mathematX.rotatePoints (pts, x,y, angle)
+		local newPts = {}
+		local v = vectr.v2 (0,0)
+				
+		-- Rotate points
+		for i=1, (#pts), 2  do
+			v.x = pts[i]-x
+			v.y = pts[i+1]-y
+			v = v:rotate(angle);
+			
+			local newX,newY = v.x,v.y
+			
+			newPts[i],newPts[i+1] = newX+x,newY+y
+		end
+		
+		return newPts;
+	end
+	
+	
+	function mathematX.lengthdir_x (length, dir)
+		return math.sin(math.rad(dir))*length
+	end
+	
+	function mathematX.lengthdir_y (length, dir)
+		return math.cos(math.rad(dir))*length
+	end
+
+	function mathematX.lengthdir (length, dir)
+		return mathematX.lengthdir_x(length, dir), mathematX.lengthdir_y(length, dir)
+	end
+
+	
 
 	function mathematX.rotateVector (xMid, yMid, xOff, yOff, angleAdd)
 		angleAdd = (angleAdd) * (math.pi/180); -- Convert to radians
@@ -79,7 +176,7 @@ local mathematX = {}
 
 
 	function mathematX.intToHexString (hexVal)
-		return string.format("%X", hexVal)
+		return string.format("%08x", hexVal)
 	end
 
 	function mathematX.hexStringToInt (hexString)
