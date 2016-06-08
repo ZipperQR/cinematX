@@ -1,15 +1,28 @@
 --***************************************************************************************
 --                                                                                      *
 -- 	textblox.lua                                                                        *
---  v0.2.5                                                                              *
+--  v0.3.1                                                                              *
 --  Documentation: http://wohlsoft.ru/pgewiki/Textblox.lua                              *
 --                                                                                      *
 --***************************************************************************************
 
 local textblox = {} --Package table
-local graphX = loadSharedAPI("graphX");
-local inputs = loadSharedAPI("inputs");
+local graphX
+local graphX2
+local graphXActive = false;
+local graphX2Active = false;
+local inputs = API.load("inputs");
 local rng = API.load("rng");
+
+if  pcall(function() graphX = API.load("graphX") end)  then
+	graphXActive = true;
+end
+if  pcall(function() graphX2 = API.load("graphX2") end)  then
+	graphX2Active = true;
+end
+
+
+
 
 function textblox.onInitAPI() --Is called when the api is loaded by loadAPI.
 	--register event handler
@@ -32,7 +45,60 @@ textblox.overrideMessageBox = false
 textblox.currentMessage = nil
 
 
+
+
+
+
+--***************************************************************************************************
+--                                                                                                  *
+--              MISCELLANEOUS FUNCTIONS													    		*
+--                                                                                                  *
+--***************************************************************************************************
 	
+	local function offsetRect (rect, x, y)
+		newRect = newRECTd()
+		
+		newRect.left = rect.left + x
+		newRect.right = rect.right + x
+		newRect.top = rect.top + y
+		newRect.bottom = rect.bottom + y
+		
+		return newRect
+	end
+
+	local function getScreenBounds (camNumber)
+		if  camNumber == nil  then
+			camNumber = 1
+		end
+		
+		local cam = Camera.get ()[camNumber]
+		local b =  {left = cam.x, 
+					right = cam.x + cam.width,
+					top = cam.y,
+					bottom = cam.y + cam.height}
+		
+		return b;	
+	end
+
+	local function sign (number)
+		if  number > 0  then
+			return 1;
+		elseif  number < 0  then
+			return -1;
+		else
+			return 0;
+		end
+	end
+	
+	local function worldToScreen (x,y)
+		local b = getScreenBounds ();
+		local x1 = x-b.left;
+		local y1 = y-b.top;
+		return x1,y1;
+	end
+
+
+
 		
 
 --***************************************************************************************************
@@ -90,6 +156,7 @@ do
 		thisFont.charWidth = 16
 		thisFont.charHeight = 16
 		thisFont.kerning = 0
+		thisFont.scale = 1
 		
 		thisFont.fontIndex = 4
 		
@@ -120,9 +187,13 @@ do
 				thisFont.imageRef = Graphics.loadImage (Misc.resolveFile(thisFont.imagePath))
 			end
 			
-			thisFont.charWidth = properties["charWidth"]  or  16
-			thisFont.charHeight = properties["charHeight"]  or  16
-			thisFont.kerning = properties["kerning"]  or  1
+			thisFont.scale = properties.scale  or  1
+			thisFont.scaleX = properties.scaleX  or  thisFont.scale
+			thisFont.scaleY = properties.scaleY  or  thisFont.scale
+			thisFont.charWidth = properties.charWidth  or  16
+			thisFont.charHeight = properties.charHeight  or  16
+			thisFont.kerning = (properties.kerning  or  1) * thisFont.scaleX
+			thisFont.leading = (properties.leading  or  1) * thisFont.scaleY
 		end
 			
 		return thisFont
@@ -133,20 +204,38 @@ do
 	end
 
 	
-	function Font:drawCharImage (character, x,y, w,h, italic,bold, opacity,color)
+	function Font:drawCharImage (character, props) --x,y, w,h, italic,bold, opacity,color, z)
 		
-		if  color == nil  then
-			color = 0xFFFFFFFF
-		end
+		local color = props.color    or  0xFFFFFFFF
+		local priority = props.z     or  3.495
+		local alpha = props.opacity  or  1.00
+		local italic = props.italic
+		local bold = props.bold
 		
-		local alpha = opacity or 1.00
 		local index = string.byte(character,1)-33
+		local x = props.x
+		local y = props.y
 		local w = self.charWidth
 		local h = self.charHeight
 		local sourceX = (index%16) * w
 		local sourceY = math.floor(index/16) * h
 
-	
+		local skewX = math.max(1, 0.2*w)
+		if  italic == false  then
+			skewX = 0
+		end
+		local scaleX = 1.4
+		local scaleY = 1.2
+		
+		if  bold == false  then
+			scaleX = 1
+			scaleY = 1
+		end
+		
+		scaleX = scaleX * self.scaleX
+		scaleY = scaleY * self.scaleY
+
+		
 		-- Draw character based on font type
 		if  self.fontType == textblox.FONTTYPE_DEFAULT  then		
 			Text.print (character, self.fontIndex, x, y)
@@ -182,15 +271,17 @@ do
 				table.insert (self.verts[color], x+w);		table.insert (self.verts[color], y);
 				]]
 			--else
-				Graphics.drawImageWP (self.imageRef, x, y, sourceX, sourceY, w, h, alpha, 3.495)
+				if  graphX2Active  then
+					--windowDebug ("GRAPHX2")
+					graphX2.image {img=self.imageRef, x=x+0.5*w,y=y+0.5*h, z=priority, rows=8, columns=16, scale=self.scale, row=sourceY/h+1, column=sourceX/w+1, 
+								   skewX=skewX, scaleX=scaleX, scaleY=scaleY, color=color}
+				
+				else
+					Graphics.drawImageWP (self.imageRef, x, y, sourceX, sourceY, w, h, alpha, priority)
+				end
 			--end
 		end		
 	end
-	
-		
-	function Font:drawTris ()
-		--graphX.
-	end	
 end
 
 
@@ -214,7 +305,10 @@ do
 	textblox.IMGNAME_DEFAULTSPRITEFONT2X2 	= textblox.getPath ("font_default2_x2.png")
 	textblox.IMGNAME_DEFAULTSPRITEFONT3 	= textblox.getPath ("font_default3.png")
 	textblox.IMGNAME_DEFAULTSPRITEFONT3X2 	= textblox.getPath ("font_default3_x2.png")
+	textblox.IMGNAME_DEFAULTSPRITEFONT4 	= textblox.getPath ("font_default4.png")
+	textblox.IMGNAME_DEFAULTSPRITEFONT4X2 	= textblox.getPath ("font_default4_x2.png")
 
+	textblox.IMGNAME_BUBBLE_FILL 			= textblox.getPath ("bubbleFill.png")
 	textblox.IMGNAME_BUBBLE_BORDER_U 		= textblox.getPath ("bubbleBorderU.png")
 	textblox.IMGNAME_BUBBLE_BORDER_D 		= textblox.getPath ("bubbleBorderD.png")
 	textblox.IMGNAME_BUBBLE_BORDER_L 		= textblox.getPath ("bubbleBorderL.png")
@@ -231,7 +325,10 @@ do
 	textblox.IMGREF_DEFAULTSPRITEFONT2X2 	= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT2X2)
 	textblox.IMGREF_DEFAULTSPRITEFONT3		= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT3)
 	textblox.IMGREF_DEFAULTSPRITEFONT3X2	= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT3X2)
+	textblox.IMGREF_DEFAULTSPRITEFONT4		= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT4)
+	textblox.IMGREF_DEFAULTSPRITEFONT4X2	= Graphics.loadImage (textblox.IMGNAME_DEFAULTSPRITEFONT4X2)
 	
+	textblox.IMGREF_BUBBLE_FILL		 		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_FILL)
 	textblox.IMGREF_BUBBLE_BORDER_U  		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_U)
 	textblox.IMGREF_BUBBLE_BORDER_D 		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_D)
 	textblox.IMGREF_BUBBLE_BORDER_L 		= Graphics.loadImage (textblox.IMGNAME_BUBBLE_BORDER_L)
@@ -248,6 +345,8 @@ do
 	textblox.FONT_SPRITEDEFAULT2X2 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 16, 	charHeight = 16, 	image = textblox.IMGREF_DEFAULTSPRITEFONT2X2, 	kerning = 0})
 	textblox.FONT_SPRITEDEFAULT3 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 9, 		charHeight = 9, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3, 	kerning = 0})
 	textblox.FONT_SPRITEDEFAULT3X2 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 18, 	charHeight = 18, 	image = textblox.IMGREF_DEFAULTSPRITEFONT3X2, 	kerning = -2})
+	textblox.FONT_SPRITEDEFAULT4 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 6, 		charHeight = 12, 	image = textblox.IMGREF_DEFAULTSPRITEFONT4, 	kerning = 0})
+	textblox.FONT_SPRITEDEFAULT4X2 	= textblox.Font (textblox.FONTTYPE_SPRITE, {charWidth = 12, 	charHeight = 24, 	image = textblox.IMGREF_DEFAULTSPRITEFONT4X2, 	kerning = -2})
 end
 
 
@@ -261,6 +360,12 @@ end
 --***************************************************************************************************
 
 do
+	function textblox.replaceLineBreaks (text)
+		local newtext = string.gsub(text, "\n", "<br>")
+		return newtext
+	end
+	
+	
 	function textblox.getStringWidth (text, font)
 		local strLen = text:len() 
 		return  (strLen * font.charWidth) + (math.max(0, strLen-1) * font.kerning)
@@ -273,23 +378,23 @@ do
 	
 	
 	function textblox.printExt (text, properties)
-		-- Setup
-		local x = properties["x"] or 400
-		local y = properties["y"] or 300
-		local z = properties["z"] or 0
+		-- Setup		
+		local x = properties.x or 400
+		local y = properties.y or 300
+		local z = properties.z or 0
 		
-		local bind = properties["bind"] or textblox.BIND_SCREEN
+		local bind = properties.bind or textblox.BIND_SCREEN
 		
 		if  bind == textblox.BIND_LEVEL  then
-			x,y = graphX.worldToScreen(x,y)
+			x,y = worldToScreen(x,y)
 		end
 		
-		local t_halign = properties["halign"] or textblox.HALIGN_LEFT
-		local t_valign = properties["valign"] or textblox.VALIGN_TOP
-		local alpha = properties["opacity"] or 1.00
+		local t_halign = properties.halign or textblox.ALIGN_LEFT
+		local t_valign = properties.valign or textblox.ALIGN_TOP
+		local alpha = properties.opacity or 1.00
 		
-		local font = properties["font"] or textblox.FONT_DEFAULT
-		local width = properties["width"] or math.huge
+		local font = properties.font or textblox.FONT_DEFAULT
+		local width = properties.width or math.huge
 		
 		
 		local lineBreaks = 0
@@ -315,8 +420,10 @@ do
 		local italicMode = false
 		local boldMode = false
 		local shakeMode = false
+		local shakeStrength = 1
 		local waveMode = false
-		local currentColor = 0xFFFFFFFF
+		local waveStrength = 1
+		local currentColor = properties.color  or  0xFFFFFFFF
 		
 		
 		-- Determine number of characters per line
@@ -344,10 +451,17 @@ do
 								
 				-- Line break
 				if  commandStr == "br"  then
-					lineWidths [lineBreaks] = charsOnLine*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
-					lineBreaks = lineBreaks + 1
-					totalLineBreaks = totalLineBreaks + 1
-					charsOnLine = 0
+					local numBreaks = 1
+					if  amountStr ~= nil  then
+						numBreaks = tonumber (amountStr)
+					end
+					
+					for it=1, numBreaks  do
+						lineWidths [lineBreaks] = charsOnLine*font.charWidth + math.max(0, charsOnLine-1)*font.kerning
+						lineBreaks = lineBreaks + 1
+						totalLineBreaks = totalLineBreaks + 1
+						charsOnLine = 0
+					end
 				end
 				
 				if  commandStr == "gt"  then
@@ -378,7 +492,6 @@ do
 					-- Increment position counters
 					charsOnLine = charsOnLine + 1
 					totalShownChars = totalShownChars + 1
-
 					
 					if  charsOnLine > numCharsPerLine + 1  then
 						lineWidths[lineBreaks] = (charsOnLine-1)*font.charWidth + math.max(0, charsOnLine-2)*font.kerning
@@ -432,8 +545,15 @@ do
 				
 				-- Line break
 				if  commandStr == "br"  then
-					lineBreaks = lineBreaks + 1
-					charsOnLine = 0
+					local numBreaks = 1
+					if  amountStr ~= nil  then
+						numBreaks = tonumber (amountStr)
+					end
+					
+					for it=1, numBreaks  do
+						lineBreaks = lineBreaks + 1
+						charsOnLine = 0
+					end					
 				end
 
 				-- Greater than
@@ -474,7 +594,16 @@ do
 	
 				-- Shake text
 				if  commandStr == "tremble"  then
-					shakeMode = true
+					shakeStrength = 1
+					if  amountStr ~= nil  then
+						shakeStrength = tonumber (amountStr)
+					end
+					
+					if  shakeStrength > 0  then
+						shakeMode = true
+					else
+						shakeMode = false
+					end
 				end
 				if  commandStr == "/tremble"  then
 					shakeMode = false
@@ -482,7 +611,16 @@ do
 				
 				-- Wave text
 				if  commandStr == "wave"  then
-					waveMode = true
+					waveStrength = 1
+					if  amountStr ~= nil  then
+						waveStrength = tonumber (amountStr)
+					end
+					
+					if  waveStrength > 0  then
+						waveMode = true
+					else
+						waveMode = false
+					end
 				end
 				if  commandStr == "/wave"  then
 					waveMode = false
@@ -525,7 +663,7 @@ do
 						-- Determine position
 						currentLineWidth = math.max(0, charsOnLine-1) * font.charWidth    +   math.max(0, charsOnLine-2) * font.kerning
 						local xPos = x + currentLineWidth
-						local yPos = y + font.charHeight*lineBreaks
+						local yPos = y + (font.charHeight + font.leading)*lineBreaks
 						
 						
 						-- if different alignments, change those values
@@ -552,19 +690,19 @@ do
 						local hAffected = 1
 											
 						if  waveMode == true  then
-							yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)
+							yAffected = yAffected + math.cos(totalShownChars*0.5 + textblox.waveModeCycle)*waveStrength
 						end
 						
 						if  shakeMode == true  then
-							local shakeX = math.max(0.5, font.charWidth * 0.125)
-							local shakeY = math.max(0.5, font.charHeight * 0.125)
+							local shakeX = math.max(0.5, font.charWidth * 0.125)*shakeStrength
+							local shakeY = math.max(0.5, font.charHeight * 0.125)*shakeStrength
 							
 							xAffected = xAffected + rng.randomInt(-1*shakeX, shakeX)
 							yAffected = yAffected + rng.randomInt(-1*shakeY, shakeY)
 						end
 						
 						-- Finally, draw the image
-						font:drawCharImage (c, xAffected, yAffected, wAffected, hAffected, italicMode,boldMode, alpha)
+						font:drawCharImage (c, {x=xAffected, y=yAffected, w=wAffected, h=hAffected, italic=italicMode, bold=boldMode, opacity=alpha, color=currentColor, z=z})
 					end
 					
 					return c
@@ -606,14 +744,20 @@ do
 	textblox.SCALE_FIXED = 1
 	textblox.SCALE_AUTO = 2
 	
+	textblox.ALIGN_LEFT = 1
+	textblox.ALIGN_RIGHT = 2
+	textblox.ALIGN_TOP = 3
+	textblox.ALIGN_BOTTOM = 4
+	textblox.ALIGN_MID = 5
+	
 	textblox.HALIGN_LEFT = 1
-	textblox.HALIGN_MID = 2
-	textblox.HALIGN_RIGHT = 3
+	textblox.HALIGN_MID = 5
+	textblox.HALIGN_RIGHT = 2
 	
-	textblox.VALIGN_TOP = 1
-	textblox.VALIGN_MID = 2
-	textblox.VALIGN_BOTTOM = 3
-	
+	textblox.VALIGN_TOP = 3
+	textblox.VALIGN_MID = 5
+	textblox.VALIGN_BOTTOM = 4
+		
 	
 	
 	function TextBlock.create(x,y, textStr, properties)
@@ -627,90 +771,113 @@ do
 		thisTextBlock.y = y
 		thisTextBlock.text = textStr
 		
-		thisTextBlock.z = properties["z"] or 2
+		thisTextBlock.z = properties.z or 4
 		
-		thisTextBlock.boxType = properties["boxType"] or textblox.BOXTYPE_MENU
-		thisTextBlock.boxTex = properties["boxTex"]
-		thisTextBlock.boxColor = properties["boxColor"] or 0x00AA0099 			-- transparent green
-		thisTextBlock.borderTable = properties["borderTable"]
+		thisTextBlock.boxType = properties.boxType  or  textblox.BOXTYPE_MENU
+		thisTextBlock.boxTex = properties.boxTex
+		thisTextBlock.borderTable = properties.borderTable
+		thisTextBlock.font = properties.font  or  textblox.FONT_DEFAULT
+		thisTextBlock.xMargin = properties.marginX  or  4
+		thisTextBlock.yMargin = properties.marginY  or  4
+
+		thisTextBlock.tailSide = properties.tailSide  or  nil
+		thisTextBlock.tailX = properties.tailX  or  nil
+		thisTextBlock.tailY = properties.tailY  or  nil
+		thisTextBlock.tailTarget = properties.tailTarget  or  nil
 		
 		
 		if  thisTextBlock.borderTable == nil  then
 		
 			if  		thisTextBlock.boxType == textblox.BOXTYPE_MENU  then
-				thisTextBlock.borderTable = graphX.getDefBorderTable ()
+				thisTextBlock.boxColor = properties.boxColor or 0x00AA00FF  -- solid green
+				thisTextBlock.textColor = properties.textColor or 0xFFFFFFFF
+				thisTextBlock.font = properties.font  or  textblox.FONT_SPRITEDEFAULTX2
 				
-				thisTextBlock.borderTable["thick"] = 8
-				thisTextBlock.borderTable["col"] = 0xFF9900FF
+				thisTextBlock.borderTable = graphX.getDefBorderTable ()
+			
+				thisTextBlock.borderTable.thick = 8
+				thisTextBlock.borderTable.col = 0xFF9900FF
 			
 			elseif  	thisTextBlock.boxType == textblox.BOXTYPE_WORDBUBBLE  then
+				thisTextBlock.boxColor = properties.boxColor  or  0xFFFFFFFF
+				thisTextBlock.font = properties.font  or  textblox.FONT_SPRITEDEFAULT4X2
+				thisTextBlock.textColor = properties.textColor  or  0x000000FF
+				thisTextBlock.yMargin = properties.marginY  or  16
+
 				thisTextBlock.borderTable = {}
-				thisTextBlock.borderTable["ulImg"] 	= textblox.IMGREF_BUBBLE_BORDER_UL
-				thisTextBlock.borderTable["uImg"] 	= textblox.IMGREF_BUBBLE_BORDER_U
-				thisTextBlock.borderTable["urImg"] 	= textblox.IMGREF_BUBBLE_BORDER_UR
-				thisTextBlock.borderTable["rImg"] 	= textblox.IMGREF_BUBBLE_BORDER_R
-				thisTextBlock.borderTable["drImg"] 	= textblox.IMGREF_BUBBLE_BORDER_DR
-				thisTextBlock.borderTable["dImg"] 	= textblox.IMGREF_BUBBLE_BORDER_D
-				thisTextBlock.borderTable["dlImg"] 	= textblox.IMGREF_BUBBLE_BORDER_DL
-				thisTextBlock.borderTable["lImg"] 	= textblox.IMGREF_BUBBLE_BORDER_L
+				thisTextBlock.borderTable.ulImg   = textblox.IMGREF_BUBBLE_BORDER_UL
+				thisTextBlock.borderTable.uImg    = textblox.IMGREF_BUBBLE_BORDER_U
+				thisTextBlock.borderTable.urImg   = textblox.IMGREF_BUBBLE_BORDER_UR
+				thisTextBlock.borderTable.rImg    = textblox.IMGREF_BUBBLE_BORDER_R
+				thisTextBlock.borderTable.drImg   = textblox.IMGREF_BUBBLE_BORDER_DR
+				thisTextBlock.borderTable.dImg    = textblox.IMGREF_BUBBLE_BORDER_D
+				thisTextBlock.borderTable.dlImg   = textblox.IMGREF_BUBBLE_BORDER_DL
+				thisTextBlock.borderTable.lImg    = textblox.IMGREF_BUBBLE_BORDER_L
 				
-				thisTextBlock.borderTable["thick"] = 8
-				thisTextBlock.borderTable["col"] = 0xFFFFFFFF
+				thisTextBlock.borderTable.thick = 8
+				thisTextBlock.borderTable.col = thisTextBlock.boxColor	
+				
+				thisTextBlock.boxTex = textblox.IMGREF_BUBBLE_FILL
 			end
 		end
+			
 		
-		
-		thisTextBlock.scaleMode = properties["scaleMode"]
+		thisTextBlock.scaleMode = properties.scaleMode
 		if  thisTextBlock.scaleMode == nil  then
 			thisTextBlock.scaleMode = textblox.SCALE_FIXED
 		end
 		
-		thisTextBlock.width = properties["width"] or 200
-		thisTextBlock.height = properties["height"] or 200
+		thisTextBlock.width = properties.width or 200
+		thisTextBlock.height = properties.height or 200
 		
-		thisTextBlock.bind = properties["bind"] or textblox.BIND_SCREEN
+		if  properties.isSceneCoords == true  then
+			thisTextBlock.bind = textblox.BIND_LEVEL
+		end
+		thisTextBlock.bind = thisTextBlock.bind  or  properties.bind or textblox.BIND_SCREEN
 		
-		thisTextBlock.halign = properties["textAnchorX"] or textblox.HALIGN_LEFT
-		thisTextBlock.valign = properties["textAnchorY"] or textblox.VALIGN_TOP
+		thisTextBlock.halign = properties.textAnchorX or textblox.ALIGN_LEFT
+		thisTextBlock.valign = properties.textAnchorY or textblox.ALIGN_TOP
+		thisTextBlock.textOffX = properties.textOffX or 0
+		thisTextBlock.textOffY = properties.textOffY or 0
 		
-		thisTextBlock.textAlpha = properties["textAlpha"] or 1
+		thisTextBlock.textAlpha = properties.textAlpha or 1
 
-		thisTextBlock.mappedFilters = properties["mappedWordFilters"] or {}
-		thisTextBlock.unmappedReplacements = properties["replaceWords"] or {}
-		thisTextBlock.madlibsWords = properties["madlibWords"] or {}
+		thisTextBlock.mappedFilters = properties.mappedWordFilters or {}
+		thisTextBlock.unmappedReplacements = properties.replaceWords or {}
+		thisTextBlock.madlibsWords = properties.madlibWords or {}
 		
-		thisTextBlock.autoClose = properties["autoClose"]
+		thisTextBlock.autoClose = properties.autoClose
 		if  thisTextBlock.autoClose == nil  then
 			thisTextBlock.autoClose = false
 		end
 		
-		thisTextBlock.speed = properties["speed"] or 0.5
+		thisTextBlock.speed = properties.speed or 0.5
 		thisTextBlock.defaultSpeed = thisTextBlock.speed
 		
-		thisTextBlock.autoTime = properties["autoTime"]
+		thisTextBlock.autoTime = properties.autoTime
 		if  (thisTextBlock.autoTime == nil)  then
 			thisTextBlock.autoTime = false
 		end
 		
-		thisTextBlock.inputClose = properties["inputClose"]
+		thisTextBlock.inputClose = properties.inputClose
 		if  (thisTextBlock.inputClose == nil)  then
 			thisTextBlock.inputClose = false
 		end
 		
 		
-		thisTextBlock.endMarkDelay = properties["endMarkDelay"] or 8
-		thisTextBlock.midMarkDelay = properties["midMarkDelay"] or 4
+		thisTextBlock.endMarkDelay = properties.endMarkDelay or 8
+		thisTextBlock.midMarkDelay = properties.midMarkDelay or 4
 
 		
-		thisTextBlock.finishDelay = properties["finishDelay"] or 10
+		thisTextBlock.finishDelay = properties.finishDelay or 10
 		
-		thisTextBlock.boxhalign = properties["boxAnchorX"] or textblox.HALIGN_LEFT
-		thisTextBlock.boxvalign = properties["boxAnchorY"] or textblox.VALIGN_TOP
+		thisTextBlock.boxhalign = properties.boxAnchorX or textblox.ALIGN_LEFT
+		thisTextBlock.boxvalign = properties.boxAnchorY or textblox.ALIGN_TOP
 		
-		thisTextBlock.typeSounds = properties["typeSounds"] or {}
-		thisTextBlock.startSound = properties["startSound"] or ""
-		thisTextBlock.finishSound = properties["finishSound"] or ""
-		thisTextBlock.closeSound = properties["closeSound"] or ""
+		thisTextBlock.typeSounds = properties.typeSounds or {}
+		thisTextBlock.startSound = properties.startSound or ""
+		thisTextBlock.finishSound = properties.finishSound or ""
+		thisTextBlock.closeSound = properties.closeSound or ""
 		
 		if  (thisTextBlock.startSound ~= "")  then
 			Audio.playSFX (textblox.getPath (thisTextBlock.startSound))
@@ -724,18 +891,13 @@ do
 		end
 		thisTextBlock.typeUsedChannel = 12
 		
-		
-		thisTextBlock.font = properties["font"] or textblox.FONT_DEFAULT
-		
-		thisTextBlock.xMargin = properties["marginX"] or 4
-		thisTextBlock.yMargin = properties["marginY"] or 4
 
-		thisTextBlock.visible = properties["visible"]
+		thisTextBlock.visible = properties.visible
 		if  thisTextBlock.visible == nil  then
 			thisTextBlock.visible = true
 		end
 		
-		thisTextBlock.pauseGame = properties["pauseGame"]
+		thisTextBlock.pauseGame = properties.pauseGame
 		if  thisTextBlock.pauseGame == nil  then
 			thisTextBlock.pauseGame = false
 		end
@@ -789,6 +951,72 @@ do
 		return TextBlock.create (x,y, textStr, properties)
 	end
 	
+
+	function TextBlock:getRect (margins)
+		-- Default margins to false
+		if margins == nil  then  margins = false;  end
+		
+		-- Get rectangle
+		local myRect = newRECTd()
+		
+		myRect.left = self.x
+		myRect.top = self.y
+		
+		-- Adjust based on anchors
+		if  self.boxhalign == textblox.ALIGN_MID     then
+			myRect.left = self.x + 0.5*self.autoWidth
+		end
+		if  self.boxhalign == textblox.ALIGN_RIGHT   then
+			myRect.left = self.x + self.autoWidth
+		end
+
+		if  self.boxvalign == textblox.ALIGN_MID     then
+			myRect.top  = self.y + 0.5*self.autoHeight
+		end
+		if  self.boxvalign == textblox.ALIGN_BOTTOM  then
+			myRect.top  = self.y + self.autoHeight
+		end
+		
+		myRect.right  = myRect.left + self.autoWidth 
+		myRect.bottom = myRect.top + self.autoHeight
+		
+		
+		-- Add margins
+		if  margins  then
+			myRect.left = myRect.left - self.xMargin
+			myRect.right = myRect.right + self.xMargin
+			myRect.top = myRect.top - self.yMargin
+			myRect.bottom = myRect.bottom + self.yMargin
+		end
+		
+		return myRect;
+	end
+		
+	function TextBlock:getScreenRect (margins)
+		local myRect = self:getRect (margins)
+		
+		if  self.bind == textblox.BIND_LEVEL  then
+			myRect.left,myRect.top = worldToScreen (myRect.left,myRect.top)
+			myRect.right,myRect.bottom = worldToScreen (myRect.right,myRect.bottom)
+		end
+		
+		return myRect;
+	end
+	
+	function TextBlock:getLevelRect (margins)
+		local myRect = self:getRect (margins)
+		local bounds = getScreenBounds ()
+		
+		if  self.bind == textblox.BIND_SCREEN  then
+			myRect.left = bounds.left + myRect.left
+			myRect.top = bounds.top + myRect.top
+			myRect.right = bounds.right + myRect.right
+			myRect.bottom = bounds.bottom + myRect.bottom
+		end
+		
+		return myRect;
+	end
+	
 	
 	function TextBlock:getCharsPerLine ()
 		local numCharsPerLine = math.floor((self.width)/(self.font.charWidth + self.font.kerning))
@@ -811,19 +1039,6 @@ do
 		local textToShow = string.sub(self:getTextWrapped (), 1, self.charsShown)
 		local textForWidth = self:getTextWrapped ()
 		
-		--[[
-		self.autoWidth = textblox.getStringWidth (self.text, self.font)
-		self.autoHeight = self.font.charHeight + self.font.kerning
-		
-		while (self.autoWidth/self.autoHeight > 4/3)  do
-			self.autoWidth = self.autoWidth*0.5
-			self.autoHeight = self.autoHeight*2
-		end
-		--]]
-		
-		--self.autoWidth = 4
-		--self.autoHeight = 4
-		---[[
 		self.autoWidth, self.autoHeight = textblox.print   (textForWidth, 
 															9999, 
 															9999,
@@ -832,12 +1047,22 @@ do
 															self.valign,
 															math.huge,--self.width,
 															0.0)
-		--]]
 		
 	
 		-- Get shake offset
 		local shakeX = rng.randomInt (-12, 12) * (self.shakeFrames/8)
 		local shakeY = rng.randomInt (-12, 12) * (self.shakeFrames/8)		
+		
+		
+		-- Get box RECT  (use level coords to simplify tail positioning)
+		if  self.scaleMode == textblox.SCALE_FIXEDAUTO  then
+			self.autoWidth = self.width
+			self.autoHeight = self.height
+		end
+		local boxRect = self:getLevelRect ()
+		local boxRectMargins = self:getLevelRect (true)
+		local shakeRect = offsetRect (boxRect, shakeX, shakeY)
+		local shakeRectMargins = offsetRect (boxRectMargins, shakeX, shakeY)
 		
 		
 		-- Get alignment and width based on scale mode
@@ -847,66 +1072,78 @@ do
 		local boxHeight = self.height 
 		
 		if  self.scaleMode == textblox.SCALE_AUTO  then
-			--boxAlignX = self.halign
-			--boxAlignY = self.valign
 			boxWidth = self.autoWidth
 			boxHeight = self.autoHeight 
-			--windowDebug ("TEST\n\n" .. tostring(self.autoWidth) .. "," .. tostring(self.autoHeight))
-		end
-
-		--[[
-		if  self.autoWidth == nil  then
-			boxWidth = 4
-		end
-		if  self.autoHeight == nil  then
-			boxHeight = 4
-		end
-		--]]
-		
-		-- Get box positioning based on anchors
-		local boxX = nil
-		local boxY = nil
-		
-		if		boxAlignX == textblox.HALIGN_LEFT  then
-			boxX = self.x + shakeX
-		
-		elseif	boxAlignX == textblox.HALIGN_RIGHT  then
-			boxX = self.x - boxWidth + shakeX
-		
 		else
-			boxX = self.x - (0.5*boxWidth) + shakeX
+			self.autoWidth = self.width
+			self.autoHeight = self.height
 		end
 
 		
-		if		boxAlignY == textblox.VALIGN_TOP  then
-			boxY = self.y + shakeY
+		-- Determine tail position
+		local tailAngle = 0
 		
-		elseif	boxAlignY == textblox.VALIGN_BOTTOM  then
-			boxY = self.y - boxHeight + shakeY
-		
-		else
-			boxY = self.y - (0.5*boxHeight) + shakeY
-		end
-
-		
-		
-		-- Draw box		
-		if  self.boxType == textblox.BOXTYPE_MENU  then
-			if  self.bind == textblox.BIND_SCREEN  then
-				graphX.menuBoxScreen (boxX-self.xMargin,
-									  boxY-self.yMargin,
-									  boxWidth + 2*self.xMargin, 
-									  boxHeight + 2*self.yMargin,
-									  self.boxColor, self.boxTex, self.borderTable)
+		if  self.boxType == textblox.BOXTYPE_WORDBUBBLE  then
+			if  self.tailTarget ~= nil  then
+				local signX, signY = 0,0
+				
+				local tailTrg = self.tailTarget
+				if  self.tailTarget.x ~= nil  then
+					signX = sign()
+					
+					
+				end
 			else
-				graphX.menuBoxLevel  (boxX-self.xMargin,
-									  boxY-self.yMargin,
-									  boxWidth + 2*self.xMargin, 
-									  boxHeight + 2*self.yMargin,
-									  self.boxColor, self.boxTex, self.borderTable)
+			
 			end
 		end
 		
+		
+		-- Draw box
+		if  graphX2Active  then
+			local sceneCoords = true
+			if  self.bind == textblox.BIND_SCREEN  then
+				sceneCoords = false
+			end
+			
+			-- Box
+			graphX2.menuBox {rect          = shakeRectMargins,
+			                 color         = self.boxColor, 
+			                 fill          = self.boxTex, 
+			                 border        = self.borderTable,
+			                 isSceneCoords = sceneCoords,
+			                 z             = self.z}
+
+			-- Tail
+			--[[
+			graphX2.box (tailX,
+						 tailY,
+						 8, 
+						 8,
+						 self.boxColor, self.tailTex)
+			]]
+		else
+			if  self.bind == textblox.BIND_SCREEN  then
+				graphX.menuBoxScreen (shakeRectMargins.left,
+									  shakeRectMargins.top,
+									  shakeRectMargins.right-boxRectMargins.left,
+									  shakeRectMargins.bottom-boxRectMargins.top,
+									  self.boxColor, self.boxTex, self.borderTable)
+			else
+				graphX.menuBoxLevel  (shakeRectMargins.left,
+									  shakeRectMargins.top,
+									  shakeRectMargins.right-boxRectMargins.left,
+									  shakeRectMargins.bottom-boxRectMargins.top,
+									  self.boxColor, self.boxTex, self.borderTable)
+			end
+			--[[
+			graphX.boxScreen (tailX,
+							  tailY,
+							  8, 
+							  8,
+							  self.boxColor, self.tailTex)
+			]]
+		end
 
 		-- Get text positioning based on anchors
 		local textX = nil
@@ -914,37 +1151,41 @@ do
 		
 		---[[
 		if		self.halign == textblox.HALIGN_LEFT  then
-			textX = boxX
+			textX = shakeRect.left
 		
 		elseif	self.halign == textblox.HALIGN_RIGHT  then
-			textX = boxX + boxWidth
+			textX = shakeRect.right
 		
 		else
-			textX = boxX + 0.5*boxWidth
+			textX = (shakeRect.left + shakeRect.right)*0.5
 		end
 
 		
 		if		self.valign == textblox.VALIGN_TOP  then
-			textY = boxY
+			textY = shakeRect.top
 		
 		elseif	self.valign == textblox.VALIGN_BOTTOM  then
-			textY = boxY + boxHeight
+			textY = shakeRect.bottom
 		
 		else
-			textY = boxY + 0.5*boxHeight
+			textY = (shakeRect.top + shakeRect.bottom)*0.5
 		end
-		--]]
+		
+		textX = textX + self.font.charWidth*0.5  + self.textOffX
+		textY = textY - self.font.charHeight*0.5 + self.textOffY
 		
 
 		-- Display text
-		self.autoWidth, self.autoHeight = textblox.printExt (textToShow, {x=textX + self.font.charWidth*0.5, 
-																		  y=textY - self.font.charHeight*0.5,
+		self.autoWidth, self.autoHeight = textblox.printExt (textToShow, {x=textX,
+																		  y=textY,
+																		  z=self.z,
 																		  font=self.font,
 																		  bind=self.bind,
 																		  width=self.autoWidth,
 																		  halign=self.halign,
 																		  valign=self.valign,
-																		  opacity=self.textAlpha})
+																		  opacity=self.textAlpha,
+																		  color=self.textColor})
 	end
 
 	
